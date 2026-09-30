@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import type { UserAccount, UserRole, ActivityType, FarmProfile } from '@/shared/types'
 import { AppButton, AppInput, AppAlert, AppConfirmDialog } from '@/shared/ui'
 import type { CreateUserDto, UpdateUserDto } from '@/api'
@@ -31,6 +31,8 @@ const editingUser = ref<UserAccount | null>(null)
 const isEditing = computed(() => editingUser.value !== null)
 const searchQuery = ref('')
 const filterDistrict = ref('all')
+const currentPage = ref(1)
+const pageSize = 25
 
 function requestDeleteUser(user: UserAccount): void {
   userToDelete.value = user
@@ -100,6 +102,22 @@ const filteredUsers = computed(() => {
       .some((value) => value!.toLowerCase().includes(search))
     return matchesDistrict && matchesSearch
   })
+})
+
+const pageCount = computed(() => Math.max(1, Math.ceil(filteredUsers.value.length / pageSize)))
+const paginatedUsers = computed(() => {
+  const start = (currentPage.value - 1) * pageSize
+  return filteredUsers.value.slice(start, start + pageSize)
+})
+const pageStart = computed(() => filteredUsers.value.length ? (currentPage.value - 1) * pageSize + 1 : 0)
+const pageEnd = computed(() => Math.min(currentPage.value * pageSize, filteredUsers.value.length))
+
+watch([activeTab, searchQuery, filterDistrict], () => {
+  currentPage.value = 1
+})
+
+watch(pageCount, (count) => {
+  if (currentPage.value > count) currentPage.value = count
 })
 
 function openCreateModal(role: 'specialist' | 'farmer'): void {
@@ -320,7 +338,7 @@ function onSubmitUser(): void {
         </thead>
         <tbody>
           <tr
-            v-for="user in filteredUsers"
+            v-for="user in paginatedUsers"
             :key="user.id"
             :class="{ 'row-deactivated': !!user.deletedAt }"
           >

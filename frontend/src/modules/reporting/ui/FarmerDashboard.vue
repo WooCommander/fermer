@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import type { FarmProfile, ReportUIModel } from '@/shared/types'
+import type { FarmProfile, ReportFormSettings, ReportUIModel } from '@/shared/types'
 import { AppBadge, AppButton, AppAlert } from '@/shared/ui'
 import { formatActivityTypeName } from '@/shared/lib'
 import { getFormSchemaByCode } from '../schemas'
@@ -8,11 +8,13 @@ import { getFormSchemaByCode } from '../schemas'
 interface Props {
   farm: FarmProfile
   reports: ReportUIModel[]
+  formSettings?: ReportFormSettings[]
   activeReportId?: string
 }
 
 const props = withDefaults(defineProps<Props>(), {
   reports: () => [],
+  formSettings: () => [],
   activeReportId: '',
 })
 
@@ -39,6 +41,7 @@ const archivedReports = computed(() => {
 
 const availableForms = computed(() => {
   return props.farm.assignedForms
+    .filter((formCode) => props.formSettings.find((settings) => settings.formCode === formCode)?.isActive !== false)
     .filter((formCode) => !props.reports.some((report) => report.formCode === formCode && report.year === selectedYear.value))
     .map((formCode) => ({
       code: formCode,
@@ -53,11 +56,10 @@ const createUrgency = computed(() => {
   const urgentForms = props.farm.assignedForms
     .filter((formCode) => !props.reports.some((report) => report.formCode === formCode && report.year === reportYear))
     .map((formCode) => {
-      const schema = getFormSchemaByCode(formCode)
-      const deadline = schema.submissionDeadline
-      if (!deadline) return null
+      const settings = props.formSettings.find((item) => item.formCode === formCode)
+      if (!settings?.isActive) return null
 
-      const dueDate = new Date(reportYear + (deadline.yearOffset ?? 0), deadline.month - 1, deadline.day, 23, 59, 59)
+      const dueDate = new Date(reportYear + settings.deadlineYearOffset, settings.submissionDeadlineMonth - 1, settings.submissionDeadlineDay, 23, 59, 59)
       const daysLeft = Math.ceil((dueDate.getTime() - now.getTime()) / 86_400_000)
       return { formCode, dueDate, daysLeft }
     })

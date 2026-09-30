@@ -1,8 +1,9 @@
-import type { FarmDto, ReportDto, ReportHistoryEventDto, CreateReportDto, SaveDraftDto, SubmitReportDto, ReviewReportDto, UserDto, CreateUserDto, UpdateUserDto } from './dto'
+import type { FarmDto, ReportDto, ReportHistoryEventDto, CreateReportDto, SaveDraftDto, SubmitReportDto, ReviewReportDto, UserDto, CreateUserDto, UpdateUserDto, ReportFormSettingsDto, UpdateReportFormSettingsDto } from './dto'
 
 const STORAGE_KEY_REPORTS = 'agrostat_reports_v7'
 const STORAGE_KEY_FARMS = 'agrostat_farms_v7'
 const STORAGE_KEY_USERS = 'agrostat_users_v7'
+const STORAGE_KEY_REPORT_FORM_SETTINGS = 'agrostat_report_form_settings_v1'
 
 const initialFarms: FarmDto[] = [
   {
@@ -618,6 +619,32 @@ function saveStoredReports(reports: ReportDto[]): void {
   localStorage.setItem(STORAGE_KEY_REPORTS, JSON.stringify(reports))
 }
 
+function createDefaultFormSettings(formCode: string): ReportFormSettingsDto {
+  const formNumber = formCode.split('-')[0]
+  const defaults: Record<string, Omit<ReportFormSettingsDto, 'form_code' | 'title'>> = {
+    '1': { is_active: true, submission_start_month: 4, submission_start_day: 1, submission_deadline_month: 6, submission_deadline_day: 10, deadline_year_offset: 0 },
+    '2': { is_active: true, submission_start_month: 9, submission_start_day: 1, submission_deadline_month: 12, submission_deadline_day: 1, deadline_year_offset: 0 },
+    '3': { is_active: true, submission_start_month: 12, submission_start_day: 15, submission_deadline_month: 1, submission_deadline_day: 15, deadline_year_offset: 1 },
+  }
+  return { form_code: formCode, title: formCode, ...(defaults[formNumber] ?? defaults['1']) }
+}
+
+function getStoredReportFormSettings(): ReportFormSettingsDto[] {
+  const formCodes = Array.from(new Set(getStoredFarms().flatMap((farm) => farm.assigned_forms)))
+  const data = localStorage.getItem(STORAGE_KEY_REPORT_FORM_SETTINGS)
+  const parsed = data ? JSON.parse(data) as ReportFormSettingsDto[] : []
+  const settings = [...parsed]
+  for (const formCode of formCodes) {
+    if (!settings.some((item) => item.form_code === formCode)) {
+      settings.push(createDefaultFormSettings(formCode))
+    }
+  }
+  if (!data || settings.length !== parsed.length) {
+    localStorage.setItem(STORAGE_KEY_REPORT_FORM_SETTINGS, JSON.stringify(settings))
+  }
+  return settings
+}
+
 function getStoredFarms(): FarmDto[] {
   const data = localStorage.getItem(STORAGE_KEY_FARMS)
   if (!data) {
@@ -677,6 +704,20 @@ function saveStoredUsers(users: UserDto[]): void {
 }
 
 export const httpClient = {
+  async getReportFormSettings(): Promise<ReportFormSettingsDto[]> {
+    return Promise.resolve(getStoredReportFormSettings())
+  },
+
+  async updateReportFormSettings(formCode: string, payload: UpdateReportFormSettingsDto): Promise<ReportFormSettingsDto> {
+    const settings = getStoredReportFormSettings()
+    const index = settings.findIndex((item) => item.form_code === formCode)
+    if (index === -1) throw new Error('Report form settings not found')
+    const updated = { ...settings[index], ...payload }
+    settings[index] = updated
+    localStorage.setItem(STORAGE_KEY_REPORT_FORM_SETTINGS, JSON.stringify(settings))
+    return Promise.resolve(updated)
+  },
+
   async authenticate(login: string, _password?: string): Promise<{ user: UserDto; farm?: FarmDto } | null> {
     const users = getStoredUsers()
     const cleanLogin = login.trim().toLowerCase()

@@ -100,6 +100,17 @@ export interface FormSchema {
   validationRules: ValidationRule[]
 }
 
+export interface ReportFormSettings {
+  formCode: string
+  title: string
+  isActive: boolean
+  submissionStartMonth: number
+  submissionStartDay: number
+  submissionDeadlineMonth: number
+  submissionDeadlineDay: number
+  deadlineYearOffset: number
+}
+
 export interface ReportItemValue {
   rowCode: string
   value: number | null

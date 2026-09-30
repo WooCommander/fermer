@@ -4,8 +4,8 @@ import { appService, AppHeader } from '@/app'
 import { useAuthState, AuthLoginForm } from '@/modules/auth'
 import { useReportingState, getFormSchemaByCode, FormWizard, FarmerDashboard, reportingService } from '@/modules/reporting'
 import { useReviewState, ReportReviewList, ReportReviewDetail } from '@/modules/review'
-import { useAdminState, AdminUserManagement } from '@/modules/admin'
-import type { ReportUIModel } from '@/shared/types'
+import { useAdminState, AdminUserManagement, AdminReportSettings } from '@/modules/admin'
+import type { ReportFormSettings, ReportUIModel } from '@/shared/types'
 import type { CreateUserDto, UpdateUserDto } from '@/api'
 
 const authState = useAuthState()
@@ -119,6 +119,10 @@ function onDeleteAdminUser(userId: string): void {
 function onRestoreAdminUser(userId: string): void {
   appService.restoreAdminUser(userId)
 }
+
+function onUpdateReportFormSettings(settings: ReportFormSettings): void {
+  appService.updateReportFormSettings(settings)
+}
 </script>
 
 <template>
@@ -175,6 +179,7 @@ function onRestoreAdminUser(userId: string): void {
           v-else-if="currentFarm"
           :farm="currentFarm"
           :reports="reportingState.state.value.reports"
+          :form-settings="reportingState.state.value.formSettings"
           @open-report="onOpenReport"
           @create-report="onCreateReport"
         />
@@ -215,6 +220,10 @@ function onRestoreAdminUser(userId: string): void {
           @update-user="onUpdateAdminUser"
           @delete-user="onDeleteAdminUser"
           @restore-user="onRestoreAdminUser"
+        />
+        <AdminReportSettings
+          :settings="reportingState.state.value.formSettings"
+          @update="onUpdateReportFormSettings"
         />
       </template>
     </main>

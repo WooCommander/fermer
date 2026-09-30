@@ -6,6 +6,7 @@ import { httpClient, type CreateUserDto, type UpdateUserDto } from '@/api'
 import { toUserAccount } from '@/modules/admin/adapters/admin.adapter'
 import { toFarmProfile } from '@/modules/auth/adapters/auth.adapter'
 import type { ReportUIModel } from '@/shared/types'
+import type { ReportFormSettings } from '@/shared/types'
 
 const SESSION_STORAGE_KEY = 'agrostat_auth_user_id'
 
@@ -20,6 +21,7 @@ export class AppService {
     try {
       const farms = await authService.fetchFarms()
       this.authState.setFarms(farms)
+      this.reportingState.setFormSettings(await reportingService.fetchFormSettings())
 
       const savedUserId = localStorage.getItem(SESSION_STORAGE_KEY)
       if (savedUserId) {
@@ -106,6 +108,11 @@ export class AppService {
     this.reportingState.addReport(report)
     this.reportingState.setActiveReport(report)
     this.validateCurrentReport()
+  }
+
+  async updateReportFormSettings(settings: ReportFormSettings): Promise<void> {
+    const updated = await reportingService.updateFormSettings(settings)
+    this.reportingState.updateFormSettings(updated)
   }
 
   setSectionIndex(index: number): void {
