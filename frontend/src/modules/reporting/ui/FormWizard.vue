@@ -76,115 +76,132 @@ function onConfirmSubmit(): void {
 </script>
 
 <template>
-  <div class="form-wizard">
-    <!-- Шапка отчета -->
-    <div class="wizard-header">
-      <div class="title-row">
-        <div>
-          <span class="form-tag">{{ props.schema.formCode }}</span>
-          <h2 class="form-main-title">{{ props.schema.title }}</h2>
+  <div class="form-wizard-layout">
+    <!-- ЛЕВАЯ КОЛОНКА: Навигация по разделам, Прогресс и Действия -->
+    <aside class="wizard-sidebar">
+      <div class="sidebar-sticky-box">
+        <div class="form-meta-card">
+          <div class="meta-top">
+            <span class="form-badge">{{ props.schema.formCode }}</span>
+            <AppBadge :status="props.report.status" />
+          </div>
+          <h2 class="form-title">{{ props.schema.title }}</h2>
+          <div class="period-line">Период: <b>{{ props.report.period }}</b></div>
         </div>
-        <AppBadge :status="props.report.status" />
-      </div>
 
-      <div class="meta-row">
-        <span>📅 Период: <b>{{ props.report.period }}</b></span>
-        <span>⏱ Срок: <b>{{ props.schema.frequency }}</b></span>
-      </div>
+        <!-- Прогресс заполнения -->
+        <div class="sidebar-progress-card">
+          <div class="progress-info">
+            <span>Готовность отчета:</span>
+            <b>{{ props.completionPercent }}%</b>
+          </div>
+          <AppProgressBar :value="props.completionPercent" :show-label="false" />
+        </div>
 
-      <!-- Причина возврата на уточнение (если есть) -->
+        <!-- Меню разделов (Sticky Table of Contents) -->
+        <nav class="sections-nav">
+          <div class="nav-title">Разделы формы:</div>
+          <button
+            v-for="(sec, idx) in props.schema.sections"
+            :key="sec.id"
+            type="button"
+            :class="['section-nav-item', { active: idx === props.activeSectionIndex }]"
+            @click="emit('updateSectionIndex', idx)"
+          >
+            <span class="sec-code">{{ sec.code }}</span>
+            <span class="sec-name">{{ sec.title.replace(/^[0-9.]+\s*/, '') }}</span>
+          </button>
+        </nav>
+
+        <!-- Кнопки управления в сайдбаре -->
+        <div v-if="!isReadonly" class="sidebar-actions">
+          <AppButton
+            variant="primary"
+            :disabled="hasErrors"
+            :loading="props.isSubmitting"
+            class="submit-action-btn"
+            @click="onSubmitClick"
+          >
+            📤 Отправить отчет в статистику
+          </AppButton>
+          <AppButton
+            variant="secondary"
+            :loading="props.isSaving"
+            class="save-action-btn"
+            @click="emit('saveDraft')"
+          >
+            💾 {{ props.isSaving ? 'Сохранение…' : 'Сохранить черновик' }}
+          </AppButton>
+        </div>
+
+        <div v-if="props.saveNotice" class="save-toast-inline">
+          <span>✅ {{ props.saveNotice }}</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ПРАВАЯ ОСНОВНАЯ КОЛОНКА: Таблица показателей и валидации -->
+    <section class="wizard-main-content">
+      <!-- Баннер утвержденного отчета (если из архива) -->
+      <AppAlert
+        v-if="props.report.status === 'approved'"
+        variant="success"
+        title="Официально принятый отчет (Архив)"
+      >
+        Данный отчет утвержден Государственной службой статистики{{ props.report.approvedAt ? ' ' + new Date(props.report.approvedAt).toLocaleDateString('ru-RU') : '' }}. Режим просмотра.
+      </AppAlert>
+
+      <!-- Баннер замечаний инспектора -->
       <AppAlert
         v-if="props.report.status === 'needs_revision' && props.report.revisionComment"
         variant="warning"
-        title="Замечание инспектора статистики"
+        title="Замечание инспектора статистики (требуется исправление)"
       >
         {{ props.report.revisionComment }}
       </AppAlert>
 
-      <!-- Прогресс заполнения -->
-      <div class="progress-box">
-        <div class="progress-title">
-          <span>Заполнение формы</span>
-          <b>{{ props.completionPercent }}%</b>
-        </div>
-        <AppProgressBar :value="props.completionPercent" :show-label="false" />
-      </div>
-    </div>
-
-    <!-- Вкладки разделов (Wizard Steps) -->
-    <div class="section-tabs-wrapper">
-      <div class="section-tabs">
-        <button
-          v-for="(sec, idx) in props.schema.sections"
-          :key="sec.id"
-          type="button"
-          :class="['section-tab-btn', { active: idx === props.activeSectionIndex }]"
-          @click="emit('updateSectionIndex', idx)"
-        >
-          <span class="tab-index">{{ sec.code }}</span>
-          <span class="tab-title">{{ sec.title.replace(/^[0-9.]+\s*/, '') }}</span>
-        </button>
-      </div>
-    </div>
-
-    <!-- Список ошибок и предупреждений -->
-    <ValidationSummary
-      :issues="props.validationIssues"
-      :confirmed-warnings="props.report.confirmedWarnings"
-      :readonly="isReadonly"
-      @confirm-warning="(ruleId, val) => emit('confirmWarning', ruleId, val)"
-    />
-
-    <!-- Активный раздел формы -->
-    <div class="section-content-box">
-      <FormSectionView
-        :section="currentSection"
-        :values="props.report.values"
-        :previous-values="props.report.previousValues"
-        :row-comments="props.report.rowComments"
+      <!-- Блок сводки ошибок и контрольных соотношений -->
+      <ValidationSummary
         :issues="props.validationIssues"
+        :confirmed-warnings="props.report.confirmedWarnings"
         :readonly="isReadonly"
-        @update-row-value="(rowCode, val) => emit('updateRowValue', rowCode, val)"
-        @update-row-comment="(rowCode, comment) => emit('updateRowComment', rowCode, comment)"
-        @fill-zeros="emit('fillZerosForSection', currentSection.id)"
-        @copy-all-previous="emit('copyPreviousForSection', currentSection.id)"
+        @confirm-warning="(ruleId, val) => emit('confirmWarning', ruleId, val)"
       />
-    </div>
 
-    <!-- Всплывающее уведомление об автосохранении -->
-    <div v-if="props.saveNotice" class="save-toast">
-      <span>💾 {{ props.saveNotice }}</span>
-    </div>
+      <!-- Табличный блок активного раздела -->
+      <div class="data-grid-container">
+        <FormSectionView
+          :section="currentSection"
+          :values="props.report.values"
+          :previous-values="props.report.previousValues"
+          :row-comments="props.report.rowComments"
+          :issues="props.validationIssues"
+          :readonly="isReadonly"
+          @update-row-value="(rowCode, val) => emit('updateRowValue', rowCode, val)"
+          @update-row-comment="(rowCode, comment) => emit('updateRowComment', rowCode, comment)"
+          @fill-zeros="emit('fillZerosForSection', currentSection.id)"
+          @copy-all-previous="emit('copyPreviousForSection', currentSection.id)"
+        />
+      </div>
 
-    <!-- Нижняя панель действий -->
-    <div class="wizard-footer">
-      <div class="footer-left">
+      <!-- Навигационный бар перехода между разделами -->
+      <div class="section-footer-nav">
         <AppButton
           v-if="props.activeSectionIndex > 0"
           variant="secondary"
           @click="prevSection"
         >
-          ← Назад
+          ← Назад: {{ props.schema.sections[props.activeSectionIndex - 1].code }}
         </AppButton>
-        <AppButton
-          v-if="!isReadonly"
-          variant="ghost"
-          :loading="props.isSaving"
-          @click="emit('saveDraft')"
-        >
-          {{ props.isSaving ? 'Сохранение…' : 'Сохранить черновик' }}
-        </AppButton>
-      </div>
+        <span v-else />
 
-      <div class="footer-right">
         <AppButton
           v-if="props.activeSectionIndex < props.schema.sections.length - 1"
           variant="primary"
           @click="nextSection"
         >
-          Далее →
+          Следующий раздел: {{ props.schema.sections[props.activeSectionIndex + 1].code }} →
         </AppButton>
-
         <AppButton
           v-else-if="!isReadonly"
           variant="success"
@@ -192,10 +209,10 @@ function onConfirmSubmit(): void {
           :loading="props.isSubmitting"
           @click="onSubmitClick"
         >
-          Отправить отчет →
+          Проверить и отправить отчет →
         </AppButton>
       </div>
-    </div>
+    </section>
 
     <!-- Модальное окно подтверждения отправки -->
     <ReportSubmitDialog
@@ -211,188 +228,206 @@ function onConfirmSubmit(): void {
 </template>
 
 <style scoped lang="scss">
-.form-wizard {
-  display: flex;
-  flex-direction: column;
-  gap: 1.25rem;
-  max-width: 760px;
-  margin: 0 auto;
-  padding-bottom: 5rem;
+.form-wizard-layout {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  gap: 1.5rem;
+  align-items: start;
+  width: 100%;
+
+  @media (max-width: 960px) {
+    grid-template-columns: 1fr;
+  }
 }
 
-.wizard-header {
+.wizard-sidebar {
+  display: flex;
+  flex-direction: column;
+}
+
+.sidebar-sticky-box {
+  position: sticky;
+  top: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.form-meta-card {
   background: #ffffff;
-  border-radius: 14px;
   border: 1px solid #e2e8f0;
+  border-radius: 12px;
   padding: 1.25rem;
   display: flex;
   flex-direction: column;
-  gap: 0.85rem;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  gap: 0.5rem;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.03);
 }
 
-.title-row {
+.meta-top {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
-  gap: 0.75rem;
+  align-items: center;
 }
 
-.form-tag {
-  font-size: 0.75rem;
-  font-weight: 700;
+.form-badge {
+  font-family: monospace;
+  font-weight: 800;
   color: #10b981;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+  background: #f0fdf4;
+  padding: 0.15rem 0.5rem;
+  border-radius: 6px;
+  font-size: 0.82rem;
 }
 
-.form-main-title {
-  font-size: 1.15rem;
-  font-weight: 700;
+.form-title {
+  font-size: 1.05rem;
+  font-weight: 800;
   color: #0f172a;
-  margin: 0.2rem 0 0;
+  margin: 0;
   line-height: 1.35;
 }
 
-.meta-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1rem;
+.period-line {
   font-size: 0.82rem;
   color: #64748b;
-  padding-bottom: 0.5rem;
-  border-bottom: 1px solid #f1f5f9;
-
-  b {
-    color: #334155;
-  }
+  b { color: #1e293b; }
 }
 
-.progress-box {
+.sidebar-progress-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 1rem;
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
+  gap: 0.5rem;
 }
 
-.progress-title {
+.progress-info {
   display: flex;
   justify-content: space-between;
-  font-size: 0.82rem;
+  font-size: 0.85rem;
   color: #475569;
 }
 
-.section-tabs-wrapper {
-  overflow-x: auto;
-  margin: -0.25rem 0;
-  padding-bottom: 0.25rem;
-}
-
-.section-tabs {
+.sections-nav {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 0.75rem;
   display: flex;
-  gap: 0.5rem;
-  min-width: max-content;
+  flex-direction: column;
+  gap: 0.35rem;
 }
 
-.section-tab-btn {
+.nav-title {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #94a3b8;
+  text-transform: uppercase;
+  padding: 0.25rem 0.5rem;
+  letter-spacing: 0.5px;
+}
+
+.section-nav-item {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.6rem 0.85rem;
-  background: #ffffff;
-  border: 1.5px solid #e2e8f0;
-  border-radius: 10px;
+  gap: 0.65rem;
+  padding: 0.55rem 0.75rem;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
   cursor: pointer;
-  transition: all 0.2s;
+  text-align: left;
+  transition: all 0.15s ease;
   font-family: inherit;
 
-  .tab-index {
-    font-weight: 700;
-    font-size: 0.82rem;
+  .sec-code {
+    font-size: 0.78rem;
+    font-weight: 800;
     color: #64748b;
     background: #f1f5f9;
-    padding: 0.1rem 0.4rem;
+    padding: 0.15rem 0.45rem;
     border-radius: 4px;
+    min-width: 24px;
+    text-align: center;
   }
 
-  .tab-title {
+  .sec-name {
     font-size: 0.85rem;
     font-weight: 600;
     color: #334155;
+    line-height: 1.3;
   }
 
   &:hover {
-    border-color: #cbd5e1;
     background: #f8fafc;
+    border-color: #e2e8f0;
   }
 
   &.active {
-    border-color: #10b981;
     background: #f0fdf4;
+    border-color: #10b981;
 
-    .tab-index {
+    .sec-code {
       background: #10b981;
       color: #ffffff;
     }
 
-    .tab-title {
+    .sec-name {
       color: #065f46;
+      font-weight: 700;
     }
   }
 }
 
-.section-content-box {
-  background: #ffffff;
-  border-radius: 14px;
-  border: 1px solid #e2e8f0;
-  padding: 1.25rem;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+.sidebar-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+
+  .submit-action-btn,
+  .save-action-btn {
+    width: 100%;
+    justify-content: center;
+  }
 }
 
-.save-toast {
-  position: fixed;
-  bottom: 5.5rem;
-  right: 1.5rem;
+.save-toast-inline {
   background: #1e293b;
   color: #ffffff;
-  padding: 0.5rem 1rem;
-  border-radius: 9999px;
-  font-size: 0.85rem;
-  font-weight: 500;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-  z-index: 100;
-  animation: fadeIn 0.3s ease;
+  padding: 0.5rem 0.75rem;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  text-align: center;
+  animation: fadeIn 0.2s ease;
 }
 
-.wizard-footer {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
+.wizard-main-content {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  min-width: 0;
+}
+
+.data-grid-container {
   background: #ffffff;
-  border-top: 1px solid #e2e8f0;
-  padding: 0.85rem 1.25rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 1.25rem 1.5rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
+}
+
+.section-footer-nav {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.05);
-  z-index: 50;
-
-  .footer-left,
-  .footer-right {
-    display: flex;
-    gap: 0.5rem;
-    align-items: center;
-  }
+  padding-top: 0.5rem;
 }
 
 @keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 </style>

@@ -84,7 +84,7 @@ const emit = defineEmits<{
   justify-content: space-between;
   flex-wrap: wrap;
   gap: 1rem;
-  max-width: 1100px;
+  max-width: 1440px;
   margin: 0 auto;
 }
 

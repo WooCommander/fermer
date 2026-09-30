@@ -37,35 +37,51 @@ function hasRowWarning(rowCode: string): boolean {
 
 <template>
   <div class="form-section-view">
-    <div class="section-meta">
-      <h3 class="section-title">{{ props.section.title }}</h3>
-      <p v-if="props.section.description" class="section-desc">{{ props.section.description }}</p>
+    <!-- Шапка раздела и быстрые действия -->
+    <div class="section-top-bar">
+      <div class="section-meta">
+        <h3 class="section-title">{{ props.section.title }}</h3>
+        <p v-if="props.section.description" class="section-desc">{{ props.section.description }}</p>
+      </div>
+
+      <div v-if="!props.readonly" class="section-quick-actions">
+        <button type="button" class="quick-btn" title="Подставить значения прошлого года для всех строк раздела" @click="emit('copyAllPrevious')">
+          📋 Копировать прошлый год
+        </button>
+        <button type="button" class="quick-btn" title="Заполнить пустые поля раздела нулями" @click="emit('fillZeros')">
+          0️⃣ Заполнить нулями
+        </button>
+      </div>
     </div>
 
-    <div v-if="!props.readonly" class="section-quick-actions">
-      <button type="button" class="quick-btn" @click="emit('copyAllPrevious')">
-        📋 Скопировать раздел из прошлого периода
-      </button>
-      <button type="button" class="quick-btn" @click="emit('fillZeros')">
-        0️⃣ Заполнить нулями пустые поля
-      </button>
-    </div>
-
-    <div class="rows-list">
-      <FormRowItem
-        v-for="row in props.section.rows"
-        :key="row.code"
-        :row="row"
-        :value="props.values[row.code] ?? null"
-        :previous-value="props.previousValues[row.code] ?? null"
-        :comment="props.rowComments[row.code] ?? ''"
-        :has-error="hasRowError(row.code)"
-        :has-warning="hasRowWarning(row.code)"
-        :readonly="props.readonly"
-        @update:value="emit('updateRowValue', row.code, $event)"
-        @update:comment="emit('updateRowComment', row.code, $event)"
-        @copy-previous="emit('updateRowValue', row.code, props.previousValues[row.code] ?? null)"
-      />
+    <!-- Плотная профессиональная таблица показателей -->
+    <div class="table-responsive-wrapper">
+      <table class="form-grid-table">
+        <thead>
+          <tr>
+            <th style="width: 55px; text-align: center;">Стр.</th>
+            <th>Наименование показателя</th>
+            <th style="width: 130px; text-align: right;">Прошлый год</th>
+            <th style="width: 145px; text-align: right;">Текущее значение</th>
+            <th style="width: 180px;">Примечание</th>
+          </tr>
+        </thead>
+        <tbody>
+          <FormRowItem
+            v-for="row in props.section.rows"
+            :key="row.code"
+            :row="row"
+            :value="props.values[row.code] ?? null"
+            :previous-value="props.previousValues[row.code] ?? null"
+            :comment="props.rowComments[row.code] ?? ''"
+            :has-error="hasRowError(row.code)"
+            :has-warning="hasRowWarning(row.code)"
+            :readonly="props.readonly"
+            @update:value="emit('updateRowValue', row.code, $event)"
+            @update:comment="emit('updateRowComment', row.code, $event)"
+          />
+        </tbody>
+      </table>
     </div>
   </div>
 </template>
@@ -74,41 +90,47 @@ function hasRowWarning(rowCode: string): boolean {
 .form-section-view {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 0.85rem;
+}
+
+.section-top-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid #e2e8f0;
 }
 
 .section-meta {
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
+  gap: 0.2rem;
+  flex: 1;
 }
 
 .section-title {
   font-size: 1.15rem;
-  font-weight: 700;
+  font-weight: 800;
   color: #0f172a;
   margin: 0;
 }
 
 .section-desc {
-  font-size: 0.85rem;
+  font-size: 0.82rem;
   color: #64748b;
   margin: 0;
-  line-height: 1.4;
+  line-height: 1.35;
 }
 
 .section-quick-actions {
   display: flex;
-  flex-wrap: wrap;
   gap: 0.5rem;
-  padding: 0.5rem;
-  background: #f8fafc;
-  border-radius: 8px;
-  border: 1px dashed #cbd5e1;
 }
 
 .quick-btn {
-  background: #ffffff;
+  background: #f8fafc;
   border: 1px solid #cbd5e1;
   border-radius: 6px;
   padding: 0.35rem 0.65rem;
@@ -116,17 +138,38 @@ function hasRowWarning(rowCode: string): boolean {
   font-weight: 600;
   color: #334155;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.15s;
+  white-space: nowrap;
 
   &:hover {
-    background: #f1f5f9;
+    background: #e2e8f0;
     border-color: #94a3b8;
+    color: #0f172a;
   }
 }
 
-.rows-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.65rem;
+.table-responsive-wrapper {
+  overflow-x: auto;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #ffffff;
+}
+
+.form-grid-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 0.88rem;
+
+  thead th {
+    background: #f8fafc;
+    padding: 0.6rem 0.75rem;
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: #475569;
+    border-bottom: 1.5px solid #cbd5e1;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+  }
 }
 </style>

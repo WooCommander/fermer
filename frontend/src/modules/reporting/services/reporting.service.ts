@@ -34,12 +34,15 @@ export class ReportingService {
     const schema = getFormSchemaByCode(formCode)
     const nextValues = { ...values }
 
-    // Проходим по всем вычисляемым строкам схемы
-    for (const section of schema.sections) {
-      for (const row of section.rows) {
-        if (row.isCalculated && row.calculationFormula) {
-          const calculated = evaluateFormulaExpression(row.calculationFormula, nextValues)
-          nextValues[row.code] = calculated
+    // Выполняем 4 прохода для полного каскадного разрешения зависимостей
+    // (например 066 -> 062 -> 114 -> 150 -> 161 -> 160)
+    for (let pass = 0; pass < 4; pass++) {
+      for (const section of schema.sections) {
+        for (const row of section.rows) {
+          if (row.isCalculated && row.calculationFormula) {
+            const calculated = evaluateFormulaExpression(row.calculationFormula, nextValues)
+            nextValues[row.code] = calculated
+          }
         }
       }
     }

@@ -1,7 +1,6 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
 import type { FormRowSchema } from '@/shared/types'
-import { AppInput } from '@/shared/ui'
 
 interface Props {
   row: FormRowSchema
@@ -25,16 +24,14 @@ const props = withDefaults(defineProps<Props>(), {
 const emit = defineEmits<{
   (e: 'update:value', value: number | null): void
   (e: 'update:comment', comment: string): void
-  (e: 'copyPrevious'): void
 }>()
-
-const showCommentField = ref(!!props.comment)
 
 const stringValue = computed(() => {
   return props.value !== null && props.value !== undefined ? props.value.toString() : ''
 })
 
-function onInputChange(val: string): void {
+function onInputChange(e: Event): void {
+  const val = (e.target as HTMLInputElement).value
   if (val.trim() === '') {
     emit('update:value', null)
   } else {
@@ -43,9 +40,9 @@ function onInputChange(val: string): void {
   }
 }
 
-function onCommentInput(e: Event): void {
-  const target = e.target as HTMLInputElement
-  emit('update:comment', target.value)
+function onCommentChange(e: Event): void {
+  const val = (e.target as HTMLInputElement).value
+  emit('update:comment', val)
 }
 
 function copyPreviousValue(): void {
@@ -56,207 +53,270 @@ function copyPreviousValue(): void {
 </script>
 
 <template>
-  <div
+  <tr
     :class="[
-      'form-row-item',
+      'grid-row-item',
       {
-        'is-calculated': props.row.isCalculated,
+        'is-calc': props.row.isCalculated,
         'has-error': props.hasError,
         'has-warning': props.hasWarning,
-        'has-indent': (props.row.indent ?? 0) > 0,
+        'has-indent-1': props.row.indent === 1,
+        'has-indent-2': props.row.indent === 2,
       },
     ]"
   >
-    <div class="row-header">
-      <div class="row-code-badge">{{ props.row.code }}</div>
-      <div class="row-title-container">
-        <span class="row-title">{{ props.row.title }}</span>
-        <span v-if="props.row.hint" class="row-hint">{{ props.row.hint }}</span>
+    <!-- Код строки -->
+    <td class="col-code">
+      <span class="code-badge">{{ props.row.code }}</span>
+    </td>
+
+    <!-- Название показателя -->
+    <td class="col-title">
+      <div class="title-cell-content">
+        <span class="row-name">{{ props.row.title }}</span>
+        <span v-if="props.row.hint" class="row-hint-inline">{{ props.row.hint }}</span>
       </div>
-      <div v-if="props.previousValue !== null && props.previousValue !== undefined" class="prev-badge" title="Значение за прошлый период">
-        <span>Прошлый: <b>{{ props.previousValue }}</b></span>
+    </td>
+
+    <!-- Прошлый период (с возможностью вставить в 1 клик) -->
+    <td class="col-prev">
+      <div v-if="props.previousValue !== null && props.previousValue !== undefined" class="prev-wrapper">
+        <span class="prev-val">{{ props.previousValue }}</span>
         <button
           v-if="!props.row.isCalculated && !props.readonly && props.value !== props.previousValue"
           type="button"
-          class="copy-prev-btn"
+          class="insert-prev-btn"
+          title="Подставить значение прошлого года"
           @click="copyPreviousValue"
         >
           Вставить
         </button>
       </div>
-    </div>
+      <span v-else class="empty-dash">—</span>
+    </td>
 
-    <div class="row-input-group">
-      <AppInput
-        :model-value="stringValue"
-        :unit="props.row.unit"
-        :readonly="props.row.isCalculated || props.readonly"
-        :placeholder="props.row.isCalculated ? 'Авторасчет' : '0.0'"
-        type="number"
-        @update:model-value="onInputChange"
-      />
+    <!-- Ввод значения / Авторасчет -->
+    <td class="col-input">
+      <div class="input-cell-box">
+        <input
+          :value="stringValue"
+          :readonly="props.row.isCalculated || props.readonly"
+          :disabled="props.readonly"
+          :placeholder="props.row.isCalculated ? '0.0 (авто)' : '0.0'"
+          type="number"
+          step="any"
+          inputmode="decimal"
+          :class="['grid-number-input', { 'input-calc': props.row.isCalculated }]"
+          @input="onInputChange"
+        />
+        <span class="unit-tag">{{ props.row.unit }}</span>
+      </div>
+    </td>
 
-      <button
-        v-if="!props.readonly"
-        type="button"
-        :class="['comment-toggle-btn', { active: showCommentField || !!props.comment }]"
-        title="Добавить комментарий к строке"
-        @click="showCommentField = !showCommentField"
-      >
-        💬
-      </button>
-    </div>
-
-    <div v-if="showCommentField || !!props.comment" class="comment-box">
+    <!-- Комментарий фермера к строке -->
+    <td class="col-comment">
       <input
         :value="props.comment"
         :disabled="props.readonly"
         type="text"
-        placeholder="Пояснение к значению (для инспектора статистики)..."
-        class="comment-input"
-        @input="onCommentInput"
+        placeholder="Пояснение..."
+        class="grid-comment-input"
+        @input="onCommentChange"
       />
-    </div>
-  </div>
+    </td>
+  </tr>
 </template>
 
 <style scoped lang="scss">
-.form-row-item {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  padding: 0.85rem;
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-radius: 10px;
-  transition: all 0.2s ease;
+.grid-row-item {
+  border-bottom: 1px solid #edf2f7;
+  transition: background-color 0.15s ease;
 
   &:hover {
-    border-color: #cbd5e1;
+    background-color: #f8fafc;
   }
 
-  &.has-indent {
-    margin-left: 1.25rem;
-    border-left: 3px solid #94a3b8;
-    background: #fafafa;
+  &.is-calc {
+    background-color: #f0fdf4;
+    font-weight: 600;
+
+    .code-badge {
+      background-color: #10b981;
+      color: #ffffff;
+    }
+
+    .row-name {
+      color: #065f46;
+      font-weight: 700;
+    }
   }
 
-  &.is-calculated {
-    background: #f8fafc;
-    border-left: 3px solid #10b981;
+  &.has-indent-1 .col-title {
+    padding-left: 1.5rem;
+  }
+
+  &.has-indent-2 .col-title {
+    padding-left: 2.75rem;
   }
 
   &.has-error {
-    border-color: #fca5a5;
-    background-color: #fff5f5;
+    background-color: #fef2f2 !important;
+    .code-badge { background-color: #ef4444; color: #fff; }
   }
 
   &.has-warning {
-    border-color: #fcd34d;
-    background-color: #fffdf5;
+    background-color: #fffbeb !important;
   }
 }
 
-.row-header {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.65rem;
+td {
+  padding: 0.45rem 0.65rem;
+  vertical-align: middle;
+  font-size: 0.88rem;
 }
 
-.row-code-badge {
+.col-code {
+  width: 55px;
+  text-align: center;
+}
+
+.code-badge {
   font-family: monospace;
-  font-size: 0.82rem;
+  font-size: 0.78rem;
   font-weight: 700;
   background: #f1f5f9;
   color: #334155;
-  padding: 0.15rem 0.45rem;
-  border-radius: 6px;
-  flex-shrink: 0;
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  display: inline-block;
 }
 
-.row-title-container {
-  flex: 1;
+.col-title {
+  min-width: 280px;
+}
+
+.title-cell-content {
   display: flex;
   flex-direction: column;
-  gap: 0.15rem;
+  gap: 0.1rem;
 }
 
-.row-title {
-  font-size: 0.92rem;
-  font-weight: 600;
+.row-name {
   color: #1e293b;
   line-height: 1.35;
 }
 
-.row-hint {
-  font-size: 0.78rem;
+.row-hint-inline {
+  font-size: 0.75rem;
   color: #64748b;
   font-style: italic;
 }
 
-.prev-badge {
-  display: flex;
-  align-items: center;
-  gap: 0.35rem;
-  font-size: 0.75rem;
-  background: #f1f5f9;
-  padding: 0.15rem 0.45rem;
-  border-radius: 6px;
-  color: #475569;
+.col-prev {
+  width: 130px;
+  text-align: right;
 }
 
-.copy-prev-btn {
+.prev-wrapper {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.35rem;
+}
+
+.prev-val {
+  font-size: 0.82rem;
+  color: #64748b;
+  font-weight: 600;
+}
+
+.insert-prev-btn {
   background: #e2e8f0;
   border: none;
-  font-size: 0.72rem;
-  font-weight: 600;
+  font-size: 0.7rem;
+  font-weight: 700;
   color: #0f172a;
   padding: 0.1rem 0.35rem;
   border-radius: 4px;
   cursor: pointer;
+  white-space: nowrap;
 
   &:hover {
     background: #cbd5e1;
+    color: #047857;
   }
 }
 
-.row-input-group {
+.empty-dash {
+  color: #cbd5e1;
+  font-size: 0.82rem;
+}
+
+.col-input {
+  width: 145px;
+}
+
+.input-cell-box {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  position: relative;
 }
 
-.comment-toggle-btn {
-  background: #f1f5f9;
-  border: 1px solid #e2e8f0;
-  padding: 0.55rem 0.65rem;
-  border-radius: 8px;
-  cursor: pointer;
-  font-size: 0.9rem;
-  line-height: 1;
+.grid-number-input {
+  width: 100%;
+  padding: 0.4rem 2.2rem 0.4rem 0.55rem;
+  font-size: 0.92rem;
+  font-weight: 600;
+  text-align: right;
+  font-family: inherit;
+  color: #0f172a;
+  background-color: #ffffff;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 6px;
+  outline: none;
+  transition: all 0.15s ease;
 
-  &.active {
-    background: #e0e7ff;
-    border-color: #c7d2fe;
+  &:focus:not(:read-only) {
+    border-color: #10b981;
+    box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
+  }
+
+  &.input-calc {
+    background-color: #dcfce7;
+    border-color: #86efac;
+    color: #065f46;
+    cursor: default;
+    font-weight: 800;
   }
 }
 
-.comment-box {
-  margin-top: 0.2rem;
+.unit-tag {
+  position: absolute;
+  right: 0.45rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #64748b;
+  pointer-events: none;
 }
 
-.comment-input {
+.col-comment {
+  width: 180px;
+}
+
+.grid-comment-input {
   width: 100%;
-  padding: 0.45rem 0.65rem;
-  font-size: 0.82rem;
+  padding: 0.35rem 0.5rem;
+  font-size: 0.78rem;
+  font-family: inherit;
   border: 1px dashed #cbd5e1;
   border-radius: 6px;
-  background: #f8fafc;
+  background-color: #fafafa;
   outline: none;
 
   &:focus {
     border-color: #10b981;
-    background: #ffffff;
+    background-color: #ffffff;
+    border-style: solid;
   }
 }
 </style>

@@ -217,10 +217,14 @@ function onDeleteAdminUser(userId: string): void {
 
 .app-main {
   flex: 1;
-  padding: 1.5rem 1.25rem;
-  max-width: 1050px;
+  padding: 1.5rem 2rem;
+  max-width: 1440px;
   width: 100%;
   margin: 0 auto;
+
+  @media (max-width: 768px) {
+    padding: 1rem 0.75rem;
+  }
 }
 
 .back-bar {

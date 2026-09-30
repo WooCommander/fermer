@@ -1,8 +1,8 @@
 import type { FarmDto, ReportDto, SaveDraftDto, SubmitReportDto, ReviewReportDto, UserDto, CreateUserDto } from './dto'
 
-const STORAGE_KEY_REPORTS = 'agrostat_reports_v2'
-const STORAGE_KEY_FARMS = 'agrostat_farms_v2'
-const STORAGE_KEY_USERS = 'agrostat_users_v2'
+const STORAGE_KEY_REPORTS = 'agrostat_reports_v3'
+const STORAGE_KEY_FARMS = 'agrostat_farms_v3'
+const STORAGE_KEY_USERS = 'agrostat_users_v3'
 
 const initialFarms: FarmDto[] = [
   {
@@ -206,6 +206,77 @@ const initialReports: ReportDto[] = [
     confirmed_warnings: {},
     revision_comment: 'Уточните строку 010 (поголовье КРС) и приложите справку о движении скота.',
     updated_at: new Date(Date.now() - 7200000).toISOString(),
+  },
+  {
+    id: 'rep-hist-1',
+    farm_id: 'farm-1',
+    farm_name: 'ООО «Агро-Нива»',
+    fiscal_code: '0200034125',
+    district: 'Слободзейский район',
+    form_code: '1-фермер',
+    form_title: 'Отчет об итогах сева под урожай',
+    period: '2025 год (Архив)',
+    year: 2025,
+    status: 'approved',
+    values: {
+      '001': 135.0,
+      '002': 105.0,
+      '003': 30.0,
+      '007': 5.0,
+      '008': 5.0,
+      '014': 130.0,
+      '015': 100.0,
+      '016': 30.0,
+      '020': 175.0,
+      '021': 55.0,
+      '024': 120.0,
+      '040': 90.0,
+      '063': 15.0,
+      '066': 8.0,
+      '114': 288.0,
+      '141': 22.0,
+      '150': 440.0,
+      '160': 500.0,
+      '161': 500.0,
+      '190': 60.0,
+    },
+    previous_values: {
+      '001': 130.0,
+      '150': 435.0,
+    },
+    row_comments: {},
+    confirmed_warnings: {},
+    updated_at: '2025-06-08T14:30:00.000Z',
+    submitted_at: '2025-06-08T14:30:00.000Z',
+    approved_at: '2025-06-09T09:15:00.000Z',
+  },
+  {
+    id: 'rep-hist-2',
+    farm_id: 'farm-1',
+    farm_name: 'ООО «Агро-Нива»',
+    fiscal_code: '0200034125',
+    district: 'Слободзейский район',
+    form_code: '2-фермер',
+    form_title: 'Отчет о сборе урожая сельскохозяйственных культур',
+    period: '2025 год (Архив)',
+    year: 2025,
+    status: 'approved',
+    values: {
+      '010': 280.0,
+      '011': 11200.0,
+      '020': 160.0,
+      '021': 6880.0,
+      '030': 120.0,
+      '031': 4320.0,
+      '040': 90.0,
+      '041': 2160.0,
+    },
+    previous_values: {},
+    row_comments: {},
+    confirmed_warnings: {},
+    updated_at: '2025-11-25T11:20:00.000Z',
+    submitted_at: '2025-11-25T11:20:00.000Z',
+    approved_at: '2025-11-26T16:45:00.000Z',
   },
 ]
 
