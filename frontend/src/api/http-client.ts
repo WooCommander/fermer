@@ -918,6 +918,25 @@ export const httpClient = {
     return Promise.resolve(getStoredFarms())
   },
 
+  async updateFarmContacts(farmId: string, payload: { phone: string; contact_person: string }): Promise<FarmDto> {
+    const farms = getStoredFarms()
+    const index = farms.findIndex((farm) => farm.id === farmId)
+    if (index === -1) {
+      throw new Error(`Farm not found: ${farmId}`)
+    }
+    const updated: FarmDto = { ...farms[index], phone: payload.phone, contact_person: payload.contact_person }
+    farms[index] = updated
+    saveStoredFarms(farms)
+
+    const users = getStoredUsers()
+    const userIndex = users.findIndex((user) => user.farm_id === farmId)
+    if (userIndex !== -1) {
+      users[userIndex] = { ...users[userIndex], phone: payload.phone }
+      saveStoredUsers(users)
+    }
+    return Promise.resolve(updated)
+  },
+
   async getFarmById(farmId: string): Promise<FarmDto | null> {
     const farms = getStoredFarms()
     return Promise.resolve(farms.find((f) => f.id === farmId) || null)
@@ -990,6 +1009,13 @@ export const httpClient = {
     const current = all[index]
     const now = new Date().toISOString()
     const nextStatus = current.status === 'draft' ? 'in_progress' : current.status
+    const history = [...(ensureReportHistory(current).history ?? [])]
+    const lastEvent = history[history.length - 1]
+    if (dto.autosave && lastEvent?.action === 'saved' && lastEvent.actor === 'farmer') {
+      history[history.length - 1] = { ...lastEvent, created_at: now }
+    } else {
+      history.push(createHistoryEvent(current, 'saved', 'farmer', nextStatus, current.status))
+    }
     const updated: ReportDto = {
       ...current,
       values: { ...dto.values },
@@ -997,10 +1023,7 @@ export const httpClient = {
       confirmed_warnings: dto.confirmed_warnings ? { ...dto.confirmed_warnings } : current.confirmed_warnings,
       status: nextStatus,
       updated_at: now,
-      history: [
-        ...(ensureReportHistory(current).history ?? []),
-        createHistoryEvent(current, 'saved', 'farmer', nextStatus, current.status),
-      ],
+      history,
     }
     all[index] = updated
     saveStoredReports(all)

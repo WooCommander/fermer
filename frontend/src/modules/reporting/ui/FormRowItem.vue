@@ -79,6 +79,7 @@ function copyPreviousValue(): void {
 
 <template>
   <tr
+    :id="`form-row-${props.row.code}`"
     :class="[
       'grid-row-item',
       {
@@ -164,6 +165,7 @@ function copyPreviousValue(): void {
 
 <style scoped lang="scss">
 .grid-row-item {
+  scroll-margin-top: calc(var(--app-header-height, 64px) + 1rem);
   border-bottom: 1px solid #edf2f7;
   transition: background-color 0.15s ease;
 
@@ -382,6 +384,59 @@ td {
     border-color: #10b981;
     background-color: #ffffff;
     border-style: solid;
+  }
+}
+
+// Узкие экраны: строка таблицы превращается в карточку (заголовок, прошлый год, поле ввода, примечание)
+@media (max-width: 700px) {
+  .grid-row-item {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 0.35rem 0.6rem;
+    padding: 0.75rem;
+
+    td {
+      display: block;
+      width: auto;
+      min-width: 0;
+      padding: 0;
+    }
+
+    .col-code {
+      grid-column: 1;
+      text-align: left;
+    }
+
+    .col-title {
+      grid-column: 2;
+    }
+
+    .col-prev,
+    .col-input,
+    .col-comment {
+      grid-column: 1 / -1;
+    }
+
+    .col-prev {
+      text-align: left;
+
+      .prev-wrapper {
+        justify-content: flex-start;
+      }
+
+      &:has(.prev-val)::before {
+        content: 'Прошлый год: ';
+        font-size: 0.78rem;
+        color: #94a3b8;
+      }
+    }
+
+    .grid-number-input,
+    .grid-comment-input {
+      font-size: 16px; // не даём iOS приближать страницу при фокусе
+      padding-top: 0.6rem;
+      padding-bottom: 0.6rem;
+    }
   }
 }
 </style>

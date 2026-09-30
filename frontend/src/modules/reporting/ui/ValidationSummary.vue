@@ -33,6 +33,10 @@ const emit = defineEmits<{
       >
         <p class="issue-text">{{ issue.message }}</p>
 
+        <button v-if="issue.rowCode" type="button" class="goto-row-btn" @click="emit('focusRow', issue.rowCode)">
+          Перейти к строке {{ issue.rowCode }} →
+        </button>
+
         <div v-if="issue.severity === 'warning' && !props.readonly" class="warning-confirm-box">
           <label class="confirm-checkbox">
             <input
@@ -63,6 +67,22 @@ const emit = defineEmits<{
 .issue-text {
   margin: 0.25rem 0 0.5rem;
   font-size: 0.88rem;
+}
+
+.goto-row-btn {
+  margin: 0 0 0.25rem;
+  padding: 0;
+  background: none;
+  border: none;
+  color: #2563eb;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+
+  &:hover {
+    text-decoration: underline;
+  }
 }
 
 .warning-confirm-box {

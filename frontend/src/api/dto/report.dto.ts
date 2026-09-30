@@ -38,6 +38,8 @@ export interface SaveDraftDto {
   values: Record<string, number | null>
   row_comments?: Record<string, string>
   confirmed_warnings?: Record<string, boolean>
+  /** Фоновое автосохранение: подряд идущие автосохранения склеиваются в одну запись истории */
+  autosave?: boolean
 }
 
 export interface CreateReportDto {

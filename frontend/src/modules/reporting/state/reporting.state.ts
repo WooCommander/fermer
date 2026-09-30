@@ -8,6 +8,8 @@ interface ReportingState {
   activeSectionIndex: number
   validationIssues: ValidationIssue[]
   isSaving: boolean
+  isDirty: boolean
+  lastSavedAt: string | null
   isSubmitting: boolean
   saveNotice: string | null
 }
@@ -19,6 +21,8 @@ const state = reactive<ReportingState>({
   activeSectionIndex: 0,
   validationIssues: [],
   isSaving: false,
+  isDirty: false,
+  lastSavedAt: null,
   isSubmitting: false,
   saveNotice: null,
 })
@@ -47,6 +51,25 @@ export const useReportingState = () => ({
     state.activeSectionIndex = 0
     state.validationIssues = []
     state.saveNotice = null
+    state.isDirty = false
+    state.lastSavedAt = null
+  },
+  // Обновляет только серверные поля сохранённого отчёта: введённое пользователем и позиция в форме не трогаются
+  mergeSavedMeta(saved: ReportUIModel) {
+    const targets = [state.activeReport, state.reports.find((r) => r.id === saved.id)]
+    for (const target of targets) {
+      if (target && target.id === saved.id) {
+        target.status = saved.status
+        target.updatedAt = saved.updatedAt
+        target.history = saved.history
+      }
+    }
+  },
+  setDirty(dirty: boolean) {
+    state.isDirty = dirty
+  },
+  setLastSavedAt(value: string | null) {
+    state.lastSavedAt = value
   },
   setActiveSectionIndex(index: number) {
     state.activeSectionIndex = index

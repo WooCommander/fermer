@@ -9,6 +9,7 @@ import type { ReportUIModel } from '@/shared/types'
 import type { ReportFormSettings } from '@/shared/types'
 
 const SESSION_STORAGE_KEY = 'agrostat_auth_user_id'
+const AUTOSAVE_DELAY_MS = 2000
 
 export class AppService {
   private authState = useAuthState()
@@ -16,7 +17,11 @@ export class AppService {
   private reviewState = useReviewState()
   private adminState = useAdminState()
 
+  private autosaveTimer: ReturnType<typeof setTimeout> | undefined
+  private unloadGuardInstalled = false
+
   async initializeApp(): Promise<void> {
+    this.installUnloadGuard()
     this.authState.setLoading(true)
     try {
       const farms = await authService.fetchFarms()
@@ -86,7 +91,8 @@ export class AppService {
     }
   }
 
-  logout(): void {
+  async logout(): Promise<void> {
+    await this.flushAutosave()
     localStorage.removeItem(SESSION_STORAGE_KEY)
     this.authState.setCurrentUser(null)
     this.authState.setCurrentFarm(null)
@@ -102,8 +108,17 @@ export class AppService {
     this.validateCurrentReport()
   }
 
-  closeReport(): void {
+  async closeReport(): Promise<void> {
+    await this.flushAutosave()
     this.reportingState.setActiveReport(null)
+  }
+
+  async updateFarmContacts(phone: string, contactPerson: string): Promise<void> {
+    const farm = this.authState.state.value.currentFarm
+    if (!farm) return
+    const updated = await authService.updateFarmContacts(farm.id, { phone, contactPerson })
+    this.authState.setCurrentFarm(updated)
+    this.authState.setFarms(this.authState.state.value.farms.map((item) => (item.id === updated.id ? updated : item)))
   }
 
   async createReport(formCode: string, year: number): Promise<void> {
@@ -134,14 +149,17 @@ export class AppService {
       this.reportingState.setAllValues(updatedValues)
       this.validateCurrentReport()
     }
+    this.markDirty()
   }
 
   updateRowComment(rowCode: string, comment: string): void {
     this.reportingState.setRowComment(rowCode, comment)
+    this.markDirty()
   }
 
   confirmWarning(ruleId: string, confirmed: boolean): void {
     this.reportingState.confirmWarning(ruleId, confirmed)
+    this.markDirty()
   }
 
   fillZerosForSection(sectionId: string): void {
@@ -161,6 +179,7 @@ export class AppService {
     const updatedValues = reportingService.recalculateFormValues(active.formCode, nextValues)
     this.reportingState.setAllValues(updatedValues)
     this.validateCurrentReport()
+    this.markDirty()
   }
 
   copyPreviousForSection(sectionId: string): void {
@@ -180,6 +199,52 @@ export class AppService {
     const updatedValues = reportingService.recalculateFormValues(active.formCode, nextValues)
     this.reportingState.setAllValues(updatedValues)
     this.validateCurrentReport()
+    this.markDirty()
+  }
+
+  private markDirty(): void {
+    this.reportingState.setDirty(true)
+    clearTimeout(this.autosaveTimer)
+    this.autosaveTimer = setTimeout(() => {
+      void this.persistActiveReport(true)
+    }, AUTOSAVE_DELAY_MS)
+  }
+
+  // Сохраняет активный отчёт, если есть несохранённые изменения (при уходе из формы, выходе из системы)
+  async flushAutosave(): Promise<void> {
+    clearTimeout(this.autosaveTimer)
+    if (this.reportingState.state.value.isDirty) {
+      await this.persistActiveReport(true)
+    }
+  }
+
+  private async persistActiveReport(autosave: boolean): Promise<boolean> {
+    const active = this.reportingState.state.value.activeReport
+    if (!active) return false
+
+    // Снимаем флаг до сохранения: правки, сделанные во время запроса, снова поставят его и запустят новое автосохранение
+    this.reportingState.setDirty(false)
+    try {
+      const saved = await reportingService.saveDraft(active, autosave)
+      this.reportingState.mergeSavedMeta(saved)
+      this.reviewState.updateReportInList(saved)
+      this.reportingState.setLastSavedAt(saved.updatedAt)
+      return true
+    } catch {
+      this.reportingState.setDirty(true)
+      return false
+    }
+  }
+
+  private installUnloadGuard(): void {
+    if (this.unloadGuardInstalled) return
+    this.unloadGuardInstalled = true
+    window.addEventListener('beforeunload', (event) => {
+      if (this.reportingState.state.value.isDirty) {
+        event.preventDefault()
+        event.returnValue = ''
+      }
+    })
   }
 
   private validateCurrentReport(): void {
@@ -194,15 +259,15 @@ export class AppService {
     const active = this.reportingState.state.value.activeReport
     if (!active) return
 
+    clearTimeout(this.autosaveTimer)
     this.reportingState.setIsSaving(true)
     try {
-      const saved = await reportingService.saveDraft(active)
-      this.reportingState.setActiveReport(saved)
-      this.reviewState.updateReportInList(saved)
-      this.reportingState.setSaveNotice('Черновик сохранён в системе')
-      setTimeout(() => {
-        this.reportingState.setSaveNotice(null)
-      }, 3000)
+      if (await this.persistActiveReport(false)) {
+        this.reportingState.setSaveNotice('Черновик сохранён в системе')
+        setTimeout(() => {
+          this.reportingState.setSaveNotice(null)
+        }, 3000)
+      }
     } finally {
       this.reportingState.setIsSaving(false)
     }
@@ -212,6 +277,7 @@ export class AppService {
     const active = this.reportingState.state.value.activeReport
     if (!active) return
 
+    await this.flushAutosave()
     this.reportingState.setIsSubmitting(true)
     try {
       const submitted = await reportingService.submitReport(active.id)

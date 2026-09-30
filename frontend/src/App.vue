@@ -51,6 +51,10 @@ function onOpenReport(report: ReportUIModel): void {
   appService.openReport(report)
 }
 
+function onUpdateContacts(phone: string, contactPerson: string): void {
+  appService.updateFarmContacts(phone, contactPerson)
+}
+
 function onCreateReport(formCode: string, year: number): void {
   appService.createReport(formCode, year)
 }
@@ -164,6 +168,8 @@ function onUpdateReportFormSettings(settings: ReportFormSettings): void {
             :is-saving="reportingState.state.value.isSaving"
             :is-submitting="reportingState.state.value.isSubmitting"
             :save-notice="reportingState.state.value.saveNotice"
+            :is-dirty="reportingState.state.value.isDirty"
+            :last-saved-at="reportingState.state.value.lastSavedAt"
             @update-section-index="onUpdateSectionIndex"
             @update-row-value="onUpdateRowValue"
             @update-row-comment="onUpdateRowComment"
@@ -183,6 +189,7 @@ function onUpdateReportFormSettings(settings: ReportFormSettings): void {
           :form-settings="reportingState.state.value.formSettings"
           @open-report="onOpenReport"
           @create-report="onCreateReport"
+          @update-contacts="onUpdateContacts"
         />
       </template>
 

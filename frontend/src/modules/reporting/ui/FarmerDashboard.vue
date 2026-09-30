@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import type { FarmProfile, ReportFormSettings, ReportUIModel } from '@/shared/types'
-import { AppBadge, AppButton, AppAlert } from '@/shared/ui'
+import { AppBadge, AppButton, AppAlert, AppProgressBar } from '@/shared/ui'
 import { formatActivityTypeName } from '@/shared/lib'
 import { getFormSchemaByCode } from '../schemas'
+import { reportingService } from '../services/reporting.service'
 
 interface Props {
   farm: FarmProfile
@@ -21,6 +22,7 @@ const props = withDefaults(defineProps<Props>(), {
 const emit = defineEmits<{
   (e: 'openReport', report: ReportUIModel): void
   (e: 'createReport', formCode: string, year: number): void
+  (e: 'updateContacts', phone: string, contactPerson: string): void
 }>()
 
 const activeTab = ref<'active' | 'archive'>('active')
@@ -90,6 +92,52 @@ watch(availableForms, (forms) => {
   }
 })
 
+// Срок сдачи показываем только для отчётов, которые ещё предстоит сдать
+function getDeadline(rep: ReportUIModel): { text: string; level: 'ok' | 'soon' | 'overdue' } | null {
+  if (rep.status === 'submitted' || rep.status === 'approved') return null
+  const settings = props.formSettings.find((item) => item.formCode === rep.formCode)
+  if (!settings) return null
+
+  const dueDate = new Date(rep.year + settings.deadlineYearOffset, settings.submissionDeadlineMonth - 1, settings.submissionDeadlineDay, 23, 59, 59)
+  const daysLeft = Math.ceil((dueDate.getTime() - Date.now()) / 86_400_000)
+  const dateText = dueDate.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })
+
+  if (daysLeft < 0) return { text: `Просрочено: срок был до ${dateText}`, level: 'overdue' }
+  if (daysLeft <= 7) return { text: `Срок: до ${dateText} (осталось дн.: ${daysLeft})`, level: 'soon' }
+  return { text: `Срок: до ${dateText}`, level: 'ok' }
+}
+
+function getProgress(rep: ReportUIModel) {
+  return reportingService.getFillProgress(rep)
+}
+
+const showContactsDialog = ref(false)
+const contactsPhone = ref('')
+const contactsPerson = ref('')
+const contactsError = ref('')
+
+function openContactsDialog(): void {
+  contactsPhone.value = props.farm.phone
+  contactsPerson.value = props.farm.contactPerson
+  contactsError.value = ''
+  showContactsDialog.value = true
+}
+
+function saveContacts(): void {
+  const phone = contactsPhone.value.trim()
+  const person = contactsPerson.value.trim()
+  if (!person) {
+    contactsError.value = 'Укажите контактное лицо'
+    return
+  }
+  if (!/^\+?373\d{8}$/.test(phone.replace(/[\s()-]/g, ''))) {
+    contactsError.value = 'Укажите номер в формате +373 XX XXX XXX'
+    return
+  }
+  emit('updateContacts', phone, person)
+  showContactsDialog.value = false
+}
+
 function openCreateDialog(): void {
   selectedFormCode.value = availableForms.value[0]?.code ?? ''
   showCreateDialog.value = true
@@ -137,6 +185,7 @@ function getSummaryKeyMetrics(rep: ReportUIModel): string {
             <span>👤 Руководитель: <b>{{ props.farm.contactPerson }}</b> • 📞 {{ props.farm.phone }}</span>
           </div>
         </div>
+        <AppButton size="sm" variant="secondary" @click="openContactsDialog">✏️ Изменить контакты</AppButton>
       </div>
     </div>
 
@@ -184,8 +233,16 @@ function getSummaryKeyMetrics(rep: ReportUIModel): string {
               <span class="form-num-badge">Форма {{ rep.formCode }}</span>
               <h4>{{ getFormSchemaByCode(rep.formCode).title }}</h4>
               <span class="period-info">Отчетный период: <b>{{ rep.period }}</b></span>
+              <span v-if="getDeadline(rep)" :class="['deadline-line', `is-${getDeadline(rep)!.level}`]">
+                {{ getDeadline(rep)!.text }}
+              </span>
             </div>
             <AppBadge :status="rep.status" />
+          </div>
+
+          <div v-if="rep.status !== 'submitted'" class="card-progress">
+            <AppProgressBar :value="getProgress(rep).percent" />
+            <small>Заполнено строк: {{ getProgress(rep).filled }} из {{ getProgress(rep).total }}</small>
           </div>
 
           <!-- Предупреждение о замечаниях инспектора -->
@@ -277,6 +334,29 @@ function getSummaryKeyMetrics(rep: ReportUIModel): string {
         <strong>Консультации по статистической отчетности:</strong>
         <p>При возникновении вопросов по заполнению форм или методологии расчетов обращайтесь в отдел статистики вашего района: <b>+373 (533) 9-22-45</b>.</p>
       </div>
+    </div>
+
+    <div v-if="showContactsDialog" class="dialog-backdrop" @click.self="showContactsDialog = false">
+      <section class="create-dialog" role="dialog" aria-modal="true" aria-labelledby="contacts-title">
+        <div class="dialog-header">
+          <h3 id="contacts-title">Контакты хозяйства</h3>
+          <button type="button" class="close-button" aria-label="Закрыть" @click="showContactsDialog = false">×</button>
+        </div>
+        <p>Эти данные используются для связи специалистов статистики с вашим хозяйством.</p>
+        <label>
+          Контактное лицо
+          <input v-model="contactsPerson" type="text" autocomplete="name" />
+        </label>
+        <label>
+          Телефон
+          <input v-model="contactsPhone" type="tel" placeholder="+373 777 00-000" autocomplete="tel" />
+        </label>
+        <p v-if="contactsError" class="contacts-error">{{ contactsError }}</p>
+        <div class="dialog-actions">
+          <AppButton variant="secondary" @click="showContactsDialog = false">Отмена</AppButton>
+          <AppButton variant="primary" @click="saveContacts">Сохранить</AppButton>
+        </div>
+      </section>
     </div>
 
     <div v-if="showCreateDialog" class="dialog-backdrop" @click.self="showCreateDialog = false">
@@ -418,6 +498,28 @@ function getSummaryKeyMetrics(rep: ReportUIModel): string {
 .dialog-header h3 { margin: 0; color: #0f172a; font-size: 1.15rem; }
 .close-button { border: 0; background: transparent; color: #64748b; font-size: 1.5rem; cursor: pointer; line-height: 1; }
 .dialog-actions { display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1.5rem; }
+.create-dialog .contacts-error { margin: 0.8rem 0 0; color: #dc2626; }
+
+.deadline-line {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #64748b;
+
+  &.is-soon { color: #b45309; }
+  &.is-overdue { color: #dc2626; }
+}
+
+.card-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+
+  small {
+    color: #64748b;
+    font-size: 0.78rem;
+  }
+}
+
 .create-dialog .no-forms-notice {
   margin: 0.9rem 0 0;
   padding: 0.75rem 0.9rem;

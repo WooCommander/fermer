@@ -50,12 +50,13 @@ export class ReportingService {
     return dto ? toReportUIModel(dto) : null
   }
 
-  async saveDraft(report: ReportUIModel): Promise<ReportUIModel> {
+  async saveDraft(report: ReportUIModel, autosave = false): Promise<ReportUIModel> {
     const dto = await httpClient.saveDraft({
       report_id: report.id,
       values: report.values,
       row_comments: report.rowComments,
       confirmed_warnings: report.confirmedWarnings,
+      autosave,
     })
     return toReportUIModel(dto)
   }
@@ -151,6 +152,18 @@ export class ReportingService {
       statusType,
       statusLabel,
     }
+  }
+
+  // Доля заполненных строк ввода (расчётные не считаются); введённый 0 — заполненная строка
+  getFillProgress(report: ReportUIModel): { filled: number; total: number; percent: number } {
+    const inputRows = getFormSchemaByCode(report.formCode).sections
+      .flatMap((section) => section.rows)
+      .filter((row) => !row.isCalculated && !row.isHeader)
+    const filled = inputRows.filter((row) => {
+      const value = report.values[row.code]
+      return typeof value === 'number' && !isNaN(value)
+    }).length
+    return { filled, total: inputRows.length, percent: inputRows.length ? Math.round((filled / inputRows.length) * 100) : 0 }
   }
 
   calculateCompletionPercent(report: ReportUIModel): number {

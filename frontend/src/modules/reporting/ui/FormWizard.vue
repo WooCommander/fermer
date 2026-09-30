@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, nextTick, ref } from 'vue'
 import type { ReportUIModel, FormSchema, ValidationIssue } from '@/shared/types'
 import { AppButton, AppProgressBar, AppBadge, AppAlert } from '@/shared/ui'
 import FormSectionView from './FormSectionView.vue'
@@ -16,6 +16,8 @@ interface Props {
   isSaving?: boolean
   isSubmitting?: boolean
   saveNotice?: string | null
+  isDirty?: boolean
+  lastSavedAt?: string | null
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -25,6 +27,8 @@ const props = withDefaults(defineProps<Props>(), {
   isSaving: false,
   isSubmitting: false,
   saveNotice: null,
+  isDirty: false,
+  lastSavedAt: null,
 })
 
 const emit = defineEmits<{
@@ -72,6 +76,35 @@ function countFilledRows(values: Record<string, number | null | undefined>): num
 const filledRowsCount = computed(() => countFilledRows(props.report.values))
 
 const previousFilledRowsCount = computed(() => countFilledRows(props.report.previousValues))
+
+const lastSavedTime = computed(() => props.lastSavedAt
+  ? new Date(props.lastSavedAt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
+  : '')
+
+// Сводка по каждому разделу для индикаторов в меню: ошибки, предупреждения, заполненность
+const sectionStats = computed(() => props.schema.sections.map((section) => {
+  const rowCodes = new Set(section.rows.map((row) => row.code))
+  const inputCodes = section.rows.filter((row) => !row.isCalculated && !row.isHeader).map((row) => row.code)
+  const inSection = (issue: ValidationIssue) => rowCodes.has(issue.rowCode)
+  return {
+    errors: props.validationIssues.filter((issue) => issue.severity === 'error' && inSection(issue)).length,
+    warnings: props.validationIssues.filter((issue) => issue.severity === 'warning' && inSection(issue)).length,
+    filled: inputCodes.filter((code) => typeof props.report.values[code] === 'number' && !isNaN(props.report.values[code] as number)).length,
+    total: inputCodes.length,
+  }
+}))
+
+// Переходит в раздел со строкой, прокручивает к ней и ставит курсор в поле ввода
+async function focusRow(rowCode: string): Promise<void> {
+  const sectionIndex = props.schema.sections.findIndex((section) => section.rows.some((row) => row.code === rowCode))
+  if (sectionIndex === -1) return
+  if (sectionIndex !== props.activeSectionIndex) emit('updateSectionIndex', sectionIndex)
+  await nextTick()
+  const rowElement = document.getElementById(`form-row-${rowCode}`)
+  if (!rowElement) return
+  rowElement.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  rowElement.querySelector<HTMLInputElement>('input:not([readonly]):not([disabled])')?.focus({ preventScroll: true })
+}
 
 function prevSection(): void {
   if (props.activeSectionIndex > 0) {
@@ -154,6 +187,10 @@ function onConfirmSubmit(): void {
           >
             <span class="sec-code">{{ sec.code }}</span>
             <span class="sec-name">{{ sec.title.replace(/^[0-9.]+\s*/, '') }}</span>
+            <span v-if="sectionStats[idx].errors > 0" class="sec-badge is-error" :title="`Ошибок: ${sectionStats[idx].errors}`">{{ sectionStats[idx].errors }}</span>
+            <span v-else-if="sectionStats[idx].warnings > 0" class="sec-badge is-warning" :title="`Предупреждений: ${sectionStats[idx].warnings}`">!</span>
+            <span v-else-if="sectionStats[idx].total > 0 && sectionStats[idx].filled === sectionStats[idx].total" class="sec-badge is-done" title="Раздел заполнен">✓</span>
+            <span v-else-if="sectionStats[idx].total > 0" class="sec-badge is-progress" title="Заполнено строк">{{ sectionStats[idx].filled }}/{{ sectionStats[idx].total }}</span>
           </button>
         </nav>
 
@@ -168,6 +205,10 @@ function onConfirmSubmit(): void {
           >
             📤 Отправить отчет в статистику
           </AppButton>
+          <div v-if="hasErrors" class="submit-blocked-hint">
+            Отправка недоступна: есть ошибки ({{ errorIssues.length }}).
+            <button type="button" class="link-btn" @click="focusRow(errorIssues[0].rowCode)">Перейти к первой ошибке</button>
+          </div>
           <AppButton
             variant="secondary"
             :loading="props.isSaving"
@@ -176,6 +217,11 @@ function onConfirmSubmit(): void {
           >
             💾 {{ props.isSaving ? 'Сохранение…' : 'Сохранить черновик' }}
           </AppButton>
+        </div>
+
+        <div v-if="!isReadonly && (props.isDirty || lastSavedTime)" class="save-status">
+          <span v-if="props.isDirty">● Есть несохранённые изменения, автосохранение…</span>
+          <span v-else>✓ Сохранено в {{ lastSavedTime }}</span>
         </div>
 
         <div v-if="props.saveNotice" class="save-toast-inline">
@@ -210,6 +256,7 @@ function onConfirmSubmit(): void {
         :confirmed-warnings="props.report.confirmedWarnings"
         :readonly="isReadonly"
         @confirm-warning="(ruleId, val) => emit('confirmWarning', ruleId, val)"
+        @focus-row="focusRow"
       />
 
       <!-- Табличный блок активного раздела -->
@@ -297,6 +344,49 @@ function onConfirmSubmit(): void {
   display: flex;
   flex-direction: column;
   gap: 1rem;
+}
+
+.submit-blocked-hint {
+  font-size: 0.8rem;
+  line-height: 1.4;
+  color: #b91c1c;
+}
+
+.link-btn {
+  display: block;
+  margin-top: 0.15rem;
+  padding: 0;
+  background: none;
+  border: none;
+  color: #2563eb;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
+.save-status {
+  font-size: 0.78rem;
+  color: #64748b;
+}
+
+.sec-badge {
+  flex-shrink: 0;
+  min-width: 1.5rem;
+  margin-left: auto;
+  padding: 0.1rem 0.4rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-align: center;
+
+  &.is-error { background: #fee2e2; color: #b91c1c; }
+  &.is-warning { background: #fef3c7; color: #b45309; }
+  &.is-done { background: #dcfce7; color: #15803d; }
+  &.is-progress { background: #f1f5f9; color: #64748b; }
 }
 
 .form-meta-card {

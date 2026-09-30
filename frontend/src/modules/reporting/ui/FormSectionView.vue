@@ -124,7 +124,7 @@ function hasRowWarning(rowCode: string): boolean {
     <AppConfirmDialog
       :open="showCopyConfirm"
       title="Скопировать данные за прошлый год?"
-      message="Значения всех строк текущего раздела будут заменены на соответствующие показатели прошлого отчётного периода (2025 г.). Текущие введённые значения раздела будут перезаписаны."
+      message="Значения всех строк текущего раздела будут заменены на соответствующие показатели прошлого отчётного периода. Текущие введённые значения раздела будут перезаписаны."
       confirm-text="Да, скопировать"
       cancel-text="Отмена"
       variant="warning"
@@ -218,6 +218,17 @@ function hasRowWarning(rowCode: string): boolean {
     border-bottom: 1.5px solid #cbd5e1;
     text-transform: uppercase;
     letter-spacing: 0.3px;
+  }
+}
+
+@media (max-width: 700px) {
+  .form-grid-table,
+  .form-grid-table tbody {
+    display: block;
+  }
+
+  .form-grid-table thead {
+    display: none;
   }
 }
 </style>
