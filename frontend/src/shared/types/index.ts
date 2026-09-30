@@ -1,0 +1,121 @@
+export type UserRole = 'farmer' | 'specialist' | 'admin'
+
+export interface UserAccount {
+  id: string
+  login: string
+  name: string
+  role: UserRole
+  phone?: string
+  email?: string
+  district?: string
+  farmId?: string
+  createdAt: string
+}
+
+export type ReportStatus =
+  | 'draft'
+  | 'in_progress'
+  | 'ready_to_submit'
+  | 'submitted'
+  | 'needs_revision'
+  | 'approved'
+
+export type ActivityType = 'crops' | 'livestock' | 'mixed'
+
+export interface KeyValuePair<T = unknown> {
+  [key: string]: T
+}
+
+export interface FarmProfile {
+  id: string
+  name: string
+  shortName: string
+  fiscalCode: string
+  district: string
+  settlement: string
+  phone: string
+  contactPerson: string
+  activityType: ActivityType
+  assignedForms: string[]
+}
+
+export type ValueType = 'number' | 'integer' | 'text' | 'boolean'
+
+export interface ValidationRule {
+  id: string
+  type: 'formula_equals' | 'formula_gte' | 'formula_lte' | 'max_decrease_percent' | 'required_if'
+  targetRowCode: string
+  expression: string
+  message: string
+  severity: 'error' | 'warning'
+}
+
+export interface FormRowSchema {
+  code: string
+  title: string
+  unit: string
+  valueType: ValueType
+  precision?: number
+  isCalculated?: boolean
+  calculationFormula?: string
+  hint?: string
+  isHeader?: boolean
+  indent?: number
+}
+
+export interface FormSectionSchema {
+  id: string
+  code: string
+  title: string
+  description?: string
+  activityGroup?: ActivityType | 'all'
+  rows: FormRowSchema[]
+}
+
+export interface FormSchema {
+  formCode: string
+  title: string
+  periodType: 'annual' | 'quarterly' | 'monthly'
+  frequency: string
+  sections: FormSectionSchema[]
+  validationRules: ValidationRule[]
+}
+
+export interface ReportItemValue {
+  rowCode: string
+  value: number | null
+  previousPeriodValue?: number | null
+  farmerComment?: string
+  inspectorComment?: string
+  hasWarningConfirmed?: boolean
+}
+
+export interface ValidationIssue {
+  ruleId: string
+  rowCode: string
+  message: string
+  severity: 'error' | 'warning'
+  actualValue?: number | null
+  expectedValue?: number | null
+}
+
+export interface ReportUIModel {
+  id: string
+  farmId: string
+  farmName: string
+  fiscalCode: string
+  district: string
+  formCode: string
+  formTitle: string
+  period: string
+  year: number
+  status: ReportStatus
+  values: Record<string, number | null>
+  previousValues: Record<string, number | null>
+  rowComments: Record<string, string>
+  confirmedWarnings: Record<string, boolean>
+  revisionComment?: string
+  updatedAt: string
+  submittedAt?: string
+  approvedAt?: string
+}
