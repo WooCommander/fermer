@@ -1,4 +1,4 @@
-import { httpClient, type CreateUserDto } from '@/api'
+import { httpClient, type CreateUserDto, type UpdateUserDto } from '@/api'
 import type { UserAccount } from '@/shared/types'
 import { toUserAccount } from '../adapters/admin.adapter'
 
@@ -10,6 +10,11 @@ export class AdminService {
 
   async createUser(payload: CreateUserDto): Promise<UserAccount> {
     const dto = await httpClient.createUser(payload)
+    return toUserAccount(dto)
+  }
+
+  async updateUser(userId: string, payload: UpdateUserDto): Promise<UserAccount> {
+    const dto = await httpClient.updateUser(userId, payload)
     return toUserAccount(dto)
   }
 

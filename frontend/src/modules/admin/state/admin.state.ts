@@ -21,6 +21,12 @@ export const useAdminState = () => ({
   addUser(user: UserAccount) {
     state.users.push(user)
   },
+  updateUser(user: UserAccount) {
+    const userIndex = state.users.findIndex((item) => item.id === user.id)
+    if (userIndex !== -1) {
+      state.users[userIndex] = user
+    }
+  },
   markUserDeleted(userId: string, deletedAt: string | null) {
     const user = state.users.find((u) => u.id === userId)
     if (user) {

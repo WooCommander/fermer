@@ -6,7 +6,7 @@ import { useReportingState, getFormSchemaByCode, FormWizard, FarmerDashboard, re
 import { useReviewState, ReportReviewList, ReportReviewDetail } from '@/modules/review'
 import { useAdminState, AdminUserManagement } from '@/modules/admin'
 import type { ReportUIModel } from '@/shared/types'
-import type { CreateUserDto } from '@/api'
+import type { CreateUserDto, UpdateUserDto } from '@/api'
 
 const authState = useAuthState()
 const reportingState = useReportingState()
@@ -102,6 +102,10 @@ function onReturnRevision(reportId: string, comment: string): void {
 // Admin (Администратор)
 function onCreateAdminUser(payload: CreateUserDto): void {
   appService.createAdminUser(payload)
+}
+
+function onUpdateAdminUser(userId: string, payload: UpdateUserDto): void {
+  appService.updateAdminUser(userId, payload)
 }
 
 function onDeleteAdminUser(userId: string): void {
@@ -200,8 +204,10 @@ function onRestoreAdminUser(userId: string): void {
       <template v-else-if="currentUser.role === 'admin'">
         <AdminUserManagement
           :users="adminState.state.value.users"
+          :farms="authState.state.value.farms"
           :is-loading="adminState.state.value.isLoading"
           @create-user="onCreateAdminUser"
+          @update-user="onUpdateAdminUser"
           @delete-user="onDeleteAdminUser"
           @restore-user="onRestoreAdminUser"
         />

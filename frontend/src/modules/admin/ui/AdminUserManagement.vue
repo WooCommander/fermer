@@ -1,29 +1,34 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import type { UserAccount, UserRole, ActivityType } from '@/shared/types'
+import type { UserAccount, UserRole, ActivityType, FarmProfile } from '@/shared/types'
 import { AppButton, AppInput, AppAlert, AppConfirmDialog } from '@/shared/ui'
-import type { CreateUserDto } from '@/api'
+import type { CreateUserDto, UpdateUserDto } from '@/api'
 
 interface Props {
   users: UserAccount[]
+  farms?: FarmProfile[]
   isLoading?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
   users: () => [],
+  farms: () => [],
   isLoading: false,
 })
 
 const emit = defineEmits<{
   (e: 'createUser', payload: CreateUserDto): void
+  (e: 'updateUser', userId: string, payload: UpdateUserDto): void
   (e: 'deleteUser', userId: string): void
   (e: 'restoreUser', userId: string): void
 }>()
 
 const activeTab = ref<'all' | UserRole | 'deactivated'>('all')
 const showCreateModal = ref(false)
-const modalRole = ref<'specialist' | 'farmer'>('specialist')
+const modalRole = ref<UserRole>('specialist')
 const userToDelete = ref<UserAccount | null>(null)
+const editingUser = ref<UserAccount | null>(null)
+const isEditing = computed(() => editingUser.value !== null)
 
 function requestDeleteUser(user: UserAccount): void {
   userToDelete.value = user
@@ -83,6 +88,7 @@ const filteredUsers = computed(() => {
 })
 
 function openCreateModal(role: 'specialist' | 'farmer'): void {
+  editingUser.value = null
   modalRole.value = role
   formError.value = ''
   formName.value = ''
@@ -97,6 +103,24 @@ function openCreateModal(role: 'specialist' | 'farmer'): void {
   showCreateModal.value = true
 }
 
+function openEditModal(user: UserAccount): void {
+  editingUser.value = user
+  modalRole.value = user.role
+  formError.value = ''
+  formName.value = user.name
+  formLogin.value = user.login
+  formPhone.value = user.phone || ''
+  formEmail.value = user.email || ''
+  formDistrict.value = user.district || districtsList[0]
+
+  const farm = user.farmId ? props.farms.find((item) => item.id === user.farmId) : null
+  formFarmName.value = farm?.name || user.name
+  formFiscalCode.value = farm?.fiscalCode || user.login
+  formActivityType.value = farm?.activityType || 'crops'
+  formAssignedForms.value = farm ? [...farm.assignedForms] : ['1-фермер']
+  showCreateModal.value = true
+}
+
 function handleFormToggle(code: string): void {
   const idx = formAssignedForms.value.indexOf(code)
   if (idx === -1) {
@@ -106,7 +130,7 @@ function handleFormToggle(code: string): void {
   }
 }
 
-function onSubmitCreate(): void {
+function onSubmitUser(): void {
   formError.value = ''
   if (!formName.value.trim() || !formLogin.value.trim()) {
     formError.value = 'Заполните обязательные поля: ФИО/Название и Логин'
@@ -129,7 +153,11 @@ function onSubmitCreate(): void {
     payload.assigned_forms = [...formAssignedForms.value]
   }
 
-  emit('createUser', payload)
+  if (editingUser.value) {
+    emit('updateUser', editingUser.value.id, payload)
+  } else {
+    emit('createUser', payload)
+  }
   showCreateModal.value = false
 }
 </script>
@@ -255,7 +283,16 @@ function onSubmitCreate(): void {
               </div>
             </td>
             <td>
-              <!-- Если пользователь деактивирован — кнопка восстановления -->
+              <!-- Диалог подтверждения деактивации пользователя -->
+              <button
+                v-if="!user.deletedAt"
+                type="button"
+                class="edit-btn"
+                title="Редактировать учетную запись"
+                @click="openEditModal(user)"
+              >
+                Редактировать
+              </button>
               <button
                 v-if="user.deletedAt"
                 type="button"
@@ -267,7 +304,7 @@ function onSubmitCreate(): void {
               </button>
               <!-- Если пользователь активен (и не суперадмин) — кнопка деактивации в архив -->
               <button
-                v-else-if="user.role !== 'admin'"
+                v-if="!user.deletedAt && user.role !== 'admin'"
                 type="button"
                 class="del-btn"
                 title="Деактивировать и перенести в архив"
@@ -275,7 +312,7 @@ function onSubmitCreate(): void {
               >
                 🗄 В архив
               </button>
-              <span v-else class="admin-shield" title="Системная учетная запись">🔒</span>
+              <span v-if="!user.deletedAt && user.role === 'admin'" class="admin-shield" title="Системная учетная запись">🔒</span>
             </td>
           </tr>
           <tr v-if="filteredUsers.length === 0">
@@ -291,7 +328,8 @@ function onSubmitCreate(): void {
     <div v-if="showCreateModal" class="modal-overlay" @click.self="showCreateModal = false">
       <div class="modal-content">
         <div class="modal-header">
-          <h3>{{ modalRole === 'specialist' ? 'Регистрация специалиста статистики' : 'Регистрация нового хозяйства (фермера)' }}</h3>
+          <h3 v-if="isEditing">Редактирование учетной записи</h3>
+          <h3 v-else>{{ modalRole === 'specialist' ? 'Регистрация специалиста статистики' : 'Регистрация нового хозяйства (фермера)' }}</h3>
           <button type="button" class="close-btn" @click="showCreateModal = false">✕</button>
         </div>
 
@@ -375,15 +413,14 @@ function onSubmitCreate(): void {
 
         <div class="modal-footer">
           <AppButton variant="secondary" @click="showCreateModal = false">Отмена</AppButton>
-          <AppButton variant="primary" @click="onSubmitCreate">
-            Создать учетную запись
+          <AppButton variant="primary" @click="onSubmitUser">
+            {{ isEditing ? 'Сохранить изменения' : 'Создать учетную запись' }}
           </AppButton>
         </div>
       </div>
     </div>
 
-    <!-- Диалог подтверждения деактивац�  &.highlight-admin {
--->
+    <!-- Диалог подтверждения деактивации пользователя -->
     <AppConfirmDialog
       :open="!!userToDelete"
       title="Удаление учетной записи"
@@ -573,6 +610,23 @@ function onSubmitCreate(): void {
   border-radius: 6px;
   cursor: pointer;
   transition: all 0.2s;
+
+  &:hover {
+    background: #dbeafe;
+    color: #1e40af;
+  }
+}
+
+.edit-btn {
+  margin-right: 0.5rem;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #1d4ed8;
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 0.35rem 0.65rem;
+  border-radius: 6px;
+  cursor: pointer;
 
   &:hover {
     background: #dbeafe;

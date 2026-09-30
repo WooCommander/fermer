@@ -24,3 +24,15 @@ export interface CreateUserDto {
   activity_type?: 'crops' | 'livestock' | 'mixed'
   assigned_forms?: string[]
 }
+
+export interface UpdateUserDto {
+  login: string
+  name: string
+  phone?: string
+  email?: string
+  district?: string
+  farm_name?: string
+  fiscal_code?: string
+  activity_type?: 'crops' | 'livestock' | 'mixed'
+  assigned_forms?: string[]
+}

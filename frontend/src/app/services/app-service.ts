@@ -2,7 +2,7 @@ import { authService, useAuthState } from '@/modules/auth'
 import { reportingService, useReportingState, getFormSchemaByCode } from '@/modules/reporting'
 import { reviewService, useReviewState } from '@/modules/review'
 import { adminService, useAdminState } from '@/modules/admin'
-import { httpClient, type CreateUserDto } from '@/api'
+import { httpClient, type CreateUserDto, type UpdateUserDto } from '@/api'
 import { toUserAccount } from '@/modules/admin/adapters/admin.adapter'
 import { toFarmProfile } from '@/modules/auth/adapters/auth.adapter'
 import type { ReportUIModel } from '@/shared/types'
@@ -252,6 +252,22 @@ export class AppService {
     try {
       const user = await adminService.createUser(payload)
       this.adminState.addUser(user)
+      const farms = await authService.fetchFarms()
+      this.authState.setFarms(farms)
+      await this.loadReviewReports()
+    } finally {
+      this.adminState.setLoading(false)
+    }
+  }
+
+  async updateAdminUser(userId: string, payload: UpdateUserDto): Promise<void> {
+    this.adminState.setLoading(true)
+    try {
+      const user = await adminService.updateUser(userId, payload)
+      this.adminState.updateUser(user)
+      if (this.authState.state.value.currentUser?.id === user.id) {
+        this.authState.setCurrentUser(user)
+      }
       const farms = await authService.fetchFarms()
       this.authState.setFarms(farms)
       await this.loadReviewReports()

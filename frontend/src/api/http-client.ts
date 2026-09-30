@@ -1,4 +1,4 @@
-import type { FarmDto, ReportDto, SaveDraftDto, SubmitReportDto, ReviewReportDto, UserDto, CreateUserDto } from './dto'
+import type { FarmDto, ReportDto, SaveDraftDto, SubmitReportDto, ReviewReportDto, UserDto, CreateUserDto, UpdateUserDto } from './dto'
 
 const STORAGE_KEY_REPORTS = 'agrostat_reports_v7'
 const STORAGE_KEY_FARMS = 'agrostat_farms_v7'
@@ -723,6 +723,60 @@ export const httpClient = {
     users.push(newUser)
     saveStoredUsers(users)
     return Promise.resolve(newUser)
+  },
+
+  async updateUser(userId: string, payload: UpdateUserDto): Promise<UserDto> {
+    const users = getStoredUsers()
+    const userIndex = users.findIndex((user) => user.id === userId)
+    if (userIndex === -1) {
+      throw new Error(`User not found: ${userId}`)
+    }
+
+    const currentUser = users[userIndex]
+    const updatedUser: UserDto = {
+      ...currentUser,
+      login: payload.login,
+      name: payload.name,
+      phone: payload.phone || undefined,
+      email: payload.email || undefined,
+      district: payload.district,
+    }
+    users[userIndex] = updatedUser
+    saveStoredUsers(users)
+
+    if (currentUser.farm_id) {
+      const farms = getStoredFarms()
+      const farmIndex = farms.findIndex((farm) => farm.id === currentUser.farm_id)
+      if (farmIndex !== -1) {
+        const currentFarm = farms[farmIndex]
+        const updatedFarm: FarmDto = {
+          ...currentFarm,
+          name: payload.farm_name || payload.name,
+          short_name: payload.farm_name || payload.name,
+          fiscal_code: payload.fiscal_code || payload.login,
+          district: payload.district || currentFarm.district,
+          phone: payload.phone || currentFarm.phone,
+          contact_person: payload.name,
+          activity_type: payload.activity_type || currentFarm.activity_type,
+          assigned_forms: payload.assigned_forms || currentFarm.assigned_forms,
+        }
+        farms[farmIndex] = updatedFarm
+        saveStoredFarms(farms)
+
+        const reports = getStoredReports().map((report) => report.farm_id === updatedFarm.id
+          ? {
+              ...report,
+              farm_name: updatedFarm.name,
+              fiscal_code: updatedFarm.fiscal_code,
+              district: updatedFarm.district,
+              updated_at: new Date().toISOString(),
+            }
+          : report)
+        saveStoredReports(reports)
+      }
+    }
+
+    return Promise.resolve(updatedUser)
   },
 
   async deleteUser(userId: string): Promise<void> {
