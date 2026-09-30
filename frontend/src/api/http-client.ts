@@ -1,9 +1,17 @@
-import type { FarmDto, ReportDto, ReportHistoryEventDto, CreateReportDto, SaveDraftDto, SubmitReportDto, ReviewReportDto, UserDto, CreateUserDto, UpdateUserDto, ReportFormSettingsDto, UpdateReportFormSettingsDto } from './dto'
+import type { HelpSettingsDto, HelpContactDto, UpdateHelpSettingsDto, FarmDto, ReportDto, ReportHistoryEventDto, CreateReportDto, SaveDraftDto, SubmitReportDto, ReviewReportDto, UserDto, CreateUserDto, UpdateUserDto, ReportFormSettingsDto, UpdateReportFormSettingsDto } from './dto'
 
 const STORAGE_KEY_REPORTS = 'agrostat_reports_v7'
 const STORAGE_KEY_FARMS = 'agrostat_farms_v7'
 const STORAGE_KEY_USERS = 'agrostat_users_v7'
 const STORAGE_KEY_REPORT_FORM_SETTINGS = 'agrostat_report_form_settings_v1'
+const STORAGE_KEY_HELP_SETTINGS = 'agrostat_help_settings_v1'
+const CENTRAL_OFFICE_LABEL = 'Центральный аппарат'
+
+const defaultHelpSettings: HelpSettingsDto = {
+  message: 'При возникновении вопросов по заполнению форм или методологии расчётов обращайтесь в отдел статистики вашего района:',
+  fallback_phone: '+373 (533) 9-22-45',
+  fallback_email: '',
+}
 
 const initialFarms: FarmDto[] = [
   {
@@ -704,6 +712,32 @@ function saveStoredUsers(users: UserDto[]): void {
 }
 
 export const httpClient = {
+  async getHelpSettings(): Promise<HelpSettingsDto> {
+    try {
+      const data = localStorage.getItem(STORAGE_KEY_HELP_SETTINGS)
+      return data ? { ...defaultHelpSettings, ...(JSON.parse(data) as Partial<HelpSettingsDto>) } : { ...defaultHelpSettings }
+    } catch {
+      return { ...defaultHelpSettings }
+    }
+  },
+
+  async updateHelpSettings(payload: UpdateHelpSettingsDto): Promise<HelpSettingsDto> {
+    localStorage.setItem(STORAGE_KEY_HELP_SETTINGS, JSON.stringify(payload))
+    return Promise.resolve({ ...payload })
+  },
+
+  // Контакты регистраторов района: сначала назначенные на этот район, иначе центральный аппарат.
+  // Отдаём только то, что нужно для связи, а не полные учётные записи.
+  async getHelpContacts(district: string): Promise<HelpContactDto[]> {
+    const specialists = getStoredUsers().filter((user) => user.role === 'specialist' && !user.deleted_at && (user.phone || user.email))
+    const districtsOf = (user: UserDto) => user.districts?.length ? user.districts : user.district ? [user.district] : []
+    const isCentral = (user: UserDto) => districtsOf(user).some((item) => item === 'all' || item.startsWith(CENTRAL_OFFICE_LABEL))
+
+    const local = specialists.filter((user) => districtsOf(user).includes(district))
+    const matched = local.length > 0 ? local : specialists.filter(isCentral)
+    return matched.slice(0, 3).map((user) => ({ name: user.name, phone: user.phone, email: user.email }))
+  },
+
   async getReportFormSettings(): Promise<ReportFormSettingsDto[]> {
     return Promise.resolve(getStoredReportFormSettings())
   },

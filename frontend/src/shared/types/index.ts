@@ -101,6 +101,18 @@ export interface FormSchema {
   validationRules: ValidationRule[]
 }
 
+export interface HelpSettings {
+  message: string
+  fallbackPhone: string
+  fallbackEmail?: string
+}
+
+export interface HelpContact {
+  name: string
+  phone?: string
+  email?: string
+}
+
 export interface ReportFormSettings {
   formCode: string
   title: string

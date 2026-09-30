@@ -1,9 +1,11 @@
 import { reactive, computed } from 'vue'
-import type { ReportFormSettings, ReportUIModel, ValidationIssue } from '@/shared/types'
+import type { HelpContact, HelpSettings, ReportFormSettings, ReportUIModel, ValidationIssue } from '@/shared/types'
 
 interface ReportingState {
   reports: ReportUIModel[]
   formSettings: ReportFormSettings[]
+  helpSettings: HelpSettings
+  helpContacts: HelpContact[]
   activeReport: ReportUIModel | null
   activeSectionIndex: number
   validationIssues: ValidationIssue[]
@@ -17,6 +19,8 @@ interface ReportingState {
 const state = reactive<ReportingState>({
   reports: [],
   formSettings: [],
+  helpSettings: { message: '', fallbackPhone: '', fallbackEmail: '' },
+  helpContacts: [],
   activeReport: null,
   activeSectionIndex: 0,
   validationIssues: [],
@@ -41,6 +45,12 @@ export const useReportingState = () => ({
   },
   setFormSettings(settings: ReportFormSettings[]) {
     state.formSettings = settings
+  },
+  setHelpSettings(settings: HelpSettings) {
+    state.helpSettings = settings
+  },
+  setHelpContacts(contacts: HelpContact[]) {
+    state.helpContacts = contacts
   },
   updateFormSettings(settings: ReportFormSettings) {
     const index = state.formSettings.findIndex((item) => item.formCode === settings.formCode)

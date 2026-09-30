@@ -4,15 +4,15 @@ import { appService, AppHeader } from '@/app'
 import { useAuthState, AuthLoginForm } from '@/modules/auth'
 import { useReportingState, getFormSchemaByCode, FormWizard, FarmerDashboard, reportingService } from '@/modules/reporting'
 import { useReviewState, ReportReviewList, ReportReviewDetail } from '@/modules/review'
-import { useAdminState, AdminUserManagement, AdminReportSettings } from '@/modules/admin'
-import type { ReportFormSettings, ReportUIModel } from '@/shared/types'
+import { useAdminState, AdminUserManagement, AdminReportSettings, AdminHelpSettings } from '@/modules/admin'
+import type { HelpSettings, ReportFormSettings, ReportUIModel } from '@/shared/types'
 import type { CreateUserDto, UpdateUserDto } from '@/api'
 
 const authState = useAuthState()
 const reportingState = useReportingState()
 const reviewState = useReviewState()
 const adminState = useAdminState()
-const adminSection = ref<'users' | 'reporting'>('users')
+const adminSection = ref<'users' | 'reporting' | 'help'>('users')
 
 onMounted(async () => {
   await appService.initializeApp()
@@ -125,6 +125,10 @@ function onRestoreAdminUser(userId: string): void {
   appService.restoreAdminUser(userId)
 }
 
+function onUpdateHelpSettings(settings: HelpSettings): void {
+  appService.updateHelpSettings(settings)
+}
+
 function onUpdateReportFormSettings(settings: ReportFormSettings): void {
   appService.updateReportFormSettings(settings)
 }
@@ -187,6 +191,8 @@ function onUpdateReportFormSettings(settings: ReportFormSettings): void {
           :farm="currentFarm"
           :reports="reportingState.state.value.reports"
           :form-settings="reportingState.state.value.formSettings"
+          :help-settings="reportingState.state.value.helpSettings"
+          :help-contacts="reportingState.state.value.helpContacts"
           @open-report="onOpenReport"
           @create-report="onCreateReport"
           @update-contacts="onUpdateContacts"
@@ -223,6 +229,7 @@ function onUpdateReportFormSettings(settings: ReportFormSettings): void {
         <div class="admin-section-tabs">
           <button type="button" :class="{ active: adminSection === 'users' }" @click="adminSection = 'users'">Пользователи и хозяйства</button>
           <button type="button" :class="{ active: adminSection === 'reporting' }" @click="adminSection = 'reporting'">Настройки отчётности</button>
+          <button type="button" :class="{ active: adminSection === 'help' }" @click="adminSection = 'help'">Справочная служба</button>
         </div>
         <AdminUserManagement
           v-if="adminSection === 'users'"
@@ -235,9 +242,14 @@ function onUpdateReportFormSettings(settings: ReportFormSettings): void {
           @restore-user="onRestoreAdminUser"
         />
         <AdminReportSettings
-          v-else
+          v-else-if="adminSection === 'reporting'"
           :settings="reportingState.state.value.formSettings"
           @update="onUpdateReportFormSettings"
+        />
+        <AdminHelpSettings
+          v-else
+          :settings="reportingState.state.value.helpSettings"
+          @update="onUpdateHelpSettings"
         />
       </template>
     </main>

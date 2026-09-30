@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
-import type { FarmProfile, ReportFormSettings, ReportUIModel } from '@/shared/types'
+import type { FarmProfile, HelpContact, HelpSettings, ReportFormSettings, ReportUIModel } from '@/shared/types'
 import { AppBadge, AppButton, AppAlert, AppProgressBar } from '@/shared/ui'
 import { formatActivityTypeName } from '@/shared/lib'
 import { getFormSchemaByCode } from '../schemas'
@@ -10,12 +10,16 @@ interface Props {
   farm: FarmProfile
   reports: ReportUIModel[]
   formSettings?: ReportFormSettings[]
+  helpSettings?: HelpSettings
+  helpContacts?: HelpContact[]
   activeReportId?: string
 }
 
 const props = withDefaults(defineProps<Props>(), {
   reports: () => [],
   formSettings: () => [],
+  helpSettings: () => ({ message: '', fallbackPhone: '', fallbackEmail: '' }),
+  helpContacts: () => [],
   activeReportId: '',
 })
 
@@ -91,6 +95,10 @@ watch(availableForms, (forms) => {
     selectedFormCode.value = forms[0]?.code ?? ''
   }
 })
+
+function phoneHref(phone: string): string {
+  return `tel:${phone.replace(/[^\d+]/g, '')}`
+}
 
 // Срок сдачи показываем только для отчётов, которые ещё предстоит сдать
 function getDeadline(rep: ReportUIModel): { text: string; level: 'ok' | 'soon' | 'overdue' } | null {
@@ -332,7 +340,18 @@ function getSummaryKeyMetrics(rep: ReportUIModel): string {
       <div class="help-icon">💡</div>
       <div class="help-text">
         <strong>Консультации по статистической отчетности:</strong>
-        <p>При возникновении вопросов по заполнению форм или методологии расчетов обращайтесь в отдел статистики вашего района: <b>+373 (533) 9-22-45</b>.</p>
+        <p v-if="props.helpSettings.message">{{ props.helpSettings.message }}</p>
+        <ul v-if="props.helpContacts.length > 0" class="help-contacts">
+          <li v-for="contact in props.helpContacts" :key="contact.name + (contact.phone ?? '')">
+            <b>{{ contact.name }}</b>
+            <a v-if="contact.phone" :href="phoneHref(contact.phone)">📞 {{ contact.phone }}</a>
+            <a v-if="contact.email" :href="`mailto:${contact.email}`">✉️ {{ contact.email }}</a>
+          </li>
+        </ul>
+        <p v-else class="help-contacts-fallback">
+          <a v-if="props.helpSettings.fallbackPhone" :href="phoneHref(props.helpSettings.fallbackPhone)"><b>{{ props.helpSettings.fallbackPhone }}</b></a>
+          <a v-if="props.helpSettings.fallbackEmail" :href="`mailto:${props.helpSettings.fallbackEmail}`">{{ props.helpSettings.fallbackEmail }}</a>
+        </p>
       </div>
     </div>
 
@@ -750,6 +769,37 @@ function getSummaryKeyMetrics(rep: ReportUIModel): string {
 
     p {
       margin: 0.2rem 0 0;
+    }
+
+    a {
+      color: inherit;
+      text-decoration: none;
+
+      &:hover {
+        text-decoration: underline;
+      }
+    }
+
+    .help-contacts {
+      display: flex;
+      flex-direction: column;
+      gap: 0.3rem;
+      margin: 0.4rem 0 0;
+      padding: 0;
+      list-style: none;
+
+      li {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.25rem 0.9rem;
+      }
+    }
+
+    .help-contacts-fallback {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.25rem 0.9rem;
     }
   }
 }

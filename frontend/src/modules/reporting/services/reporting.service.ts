@@ -1,5 +1,5 @@
 import { httpClient } from '@/api'
-import type { ReportFormSettings, ReportUIModel, ValidationIssue } from '@/shared/types'
+import type { HelpContact, HelpSettings, ReportFormSettings, ReportUIModel, ValidationIssue } from '@/shared/types'
 import { toReportUIModel } from '../adapters/report.adapter'
 import { getFormSchemaByCode } from '../schemas'
 import { validateFormValues, evaluateFormulaExpression } from '@/shared/lib'
@@ -38,6 +38,24 @@ export class ReportingService {
       submissionDeadlineDay: updated.submission_deadline_day,
       deadlineYearOffset: updated.deadline_year_offset,
     }
+  }
+
+  async fetchHelpSettings(): Promise<HelpSettings> {
+    const dto = await httpClient.getHelpSettings()
+    return { message: dto.message, fallbackPhone: dto.fallback_phone, fallbackEmail: dto.fallback_email ?? '' }
+  }
+
+  async updateHelpSettings(settings: HelpSettings): Promise<HelpSettings> {
+    const dto = await httpClient.updateHelpSettings({
+      message: settings.message,
+      fallback_phone: settings.fallbackPhone,
+      fallback_email: settings.fallbackEmail,
+    })
+    return { message: dto.message, fallbackPhone: dto.fallback_phone, fallbackEmail: dto.fallback_email ?? '' }
+  }
+
+  async fetchHelpContacts(district: string): Promise<HelpContact[]> {
+    return httpClient.getHelpContacts(district)
   }
 
   async fetchReportsByFarm(farmId: string): Promise<ReportUIModel[]> {

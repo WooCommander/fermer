@@ -5,7 +5,7 @@ import { adminService, useAdminState } from '@/modules/admin'
 import { httpClient, type CreateUserDto, type UpdateUserDto } from '@/api'
 import { toUserAccount } from '@/modules/admin/adapters/admin.adapter'
 import { toFarmProfile } from '@/modules/auth/adapters/auth.adapter'
-import type { ReportUIModel } from '@/shared/types'
+import type { HelpSettings, ReportUIModel } from '@/shared/types'
 import type { ReportFormSettings } from '@/shared/types'
 
 const SESSION_STORAGE_KEY = 'agrostat_auth_user_id'
@@ -27,6 +27,7 @@ export class AppService {
       const farms = await authService.fetchFarms()
       this.authState.setFarms(farms)
       this.reportingState.setFormSettings(await reportingService.fetchFormSettings())
+      this.reportingState.setHelpSettings(await reportingService.fetchHelpSettings())
 
       const savedUserId = localStorage.getItem(SESSION_STORAGE_KEY)
       if (savedUserId) {
@@ -74,6 +75,7 @@ export class AppService {
         this.authState.setCurrentFarm(farm)
         const reports = await reportingService.fetchReportsByFarm(farm.id)
         this.reportingState.setReports(reports)
+        this.reportingState.setHelpContacts(await reportingService.fetchHelpContacts(farm.district))
       }
       this.reportingState.setActiveReport(null)
     } else if (user.role === 'specialist') {
@@ -134,6 +136,10 @@ export class AppService {
   async updateReportFormSettings(settings: ReportFormSettings): Promise<void> {
     const updated = await reportingService.updateFormSettings(settings)
     this.reportingState.updateFormSettings(updated)
+  }
+
+  async updateHelpSettings(settings: HelpSettings): Promise<void> {
+    this.reportingState.setHelpSettings(await reportingService.updateHelpSettings(settings))
   }
 
   setSectionIndex(index: number): void {
