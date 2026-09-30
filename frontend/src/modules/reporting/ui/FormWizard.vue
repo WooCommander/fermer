@@ -55,13 +55,23 @@ const hasErrors = computed(() => {
 const errorIssues = computed(() => props.validationIssues.filter((i) => i.severity === 'error'))
 const warningIssues = computed(() => props.validationIssues.filter((i) => i.severity === 'warning'))
 
-const filledRowsCount = computed(() => {
-  return Object.values(props.report.values).filter((v) => v !== null && v !== undefined && !isNaN(v) && v > 0).length
-})
+// Считаем только строки, которые вводит сам фермер: расчётные хранятся как 0 и без его участия.
+// Явно введённый 0 — это заполненная строка.
+const inputRowCodes = computed(() => new Set(
+  props.schema.sections.flatMap((section) => section.rows
+    .filter((row) => !row.isCalculated && !row.isHeader)
+    .map((row) => row.code)),
+))
 
-const previousFilledRowsCount = computed(() => {
-  return Object.values(props.report.previousValues).filter((v) => v !== null && v !== undefined && !isNaN(v) && v > 0).length
-})
+function countFilledRows(values: Record<string, number | null | undefined>): number {
+  return Object.entries(values)
+    .filter(([code, value]) => inputRowCodes.value.has(code) && typeof value === 'number' && !isNaN(value))
+    .length
+}
+
+const filledRowsCount = computed(() => countFilledRows(props.report.values))
+
+const previousFilledRowsCount = computed(() => countFilledRows(props.report.previousValues))
 
 function prevSection(): void {
   if (props.activeSectionIndex > 0) {

@@ -28,14 +28,18 @@ const showCreateDialog = ref(false)
 const selectedFormCode = ref('')
 const selectedYear = ref(new Date().getFullYear())
 
-// Текущие отчеты (2026 год)
+// Текущие — всё, что ещё не принято (в том числе неисправленные отчёты прошлых лет)
 const currentReports = computed(() => {
-  return props.reports.filter((r) => r.year >= 2026 && r.status !== 'approved')
+  return props.reports
+    .filter((r) => r.status !== 'approved')
+    .sort((first, second) => second.year - first.year)
 })
 
-// Архивные и сданные отчеты (прошлые годы или утвержденные)
+// Архив — только принятые отчёты
 const archivedReports = computed(() => {
-  return props.reports.filter((r) => r.year < 2026 || r.status === 'approved')
+  return props.reports
+    .filter((r) => r.status === 'approved')
+    .sort((first, second) => second.year - first.year)
 })
 
 const availableForms = computed(() => {
@@ -162,7 +166,7 @@ function getSummaryKeyMetrics(rep: ReportUIModel): string {
       </div>
     </div>
 
-    <!-- 1. ВКЛАДКА: ТЕКУЩИЕ ОТЧЕТЫ (2026 год) -->
+    <!-- 1. ВКЛАДКА: ТЕКУЩИЕ ОТЧЕТЫ -->
     <div v-if="activeTab === 'active'" class="reports-section">
       <div class="section-title-box">
         <h3>Назначенные статистические отчеты (текущий период)</h3>
@@ -209,7 +213,8 @@ function getSummaryKeyMetrics(rep: ReportUIModel): string {
         </div>
 
         <div v-if="currentReports.length === 0" class="empty-box">
-          <p>Все назначенные формы на текущий отчетный период сданы и приняты!</p>
+          <p v-if="props.reports.length === 0">Отчётов пока нет. Нажмите «Создать отчёт», чтобы начать заполнение.</p>
+          <p v-else>Все назначенные формы сданы и приняты!</p>
         </div>
       </div>
     </div>
