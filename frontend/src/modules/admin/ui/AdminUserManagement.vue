@@ -406,6 +406,14 @@ function onSubmitUser(): void {
           </tr>
         </tbody>
       </table>
+      <div v-if="filteredUsers.length > 0" class="pagination-bar">
+        <span>Показано {{ pageStart }}–{{ pageEnd }} из {{ filteredUsers.length }}</span>
+        <div class="pagination-actions">
+          <AppButton size="sm" variant="secondary" :disabled="currentPage === 1" @click="currentPage -= 1">Назад</AppButton>
+          <span>Страница {{ currentPage }} из {{ pageCount }}</span>
+          <AppButton size="sm" variant="secondary" :disabled="currentPage === pageCount" @click="currentPage += 1">Далее</AppButton>
+        </div>
+      </div>
     </div>
 
     <!-- Модальное окно добавления пользователя -->
@@ -986,5 +994,26 @@ code {
   padding: 1rem 1.5rem;
   background: #f8fafc;
   border-top: 1px solid #e2e8f0;
+}
+.pagination-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+  color: #64748b;
+  font-size: 0.84rem;
+}
+
+.pagination-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  color: #475569;
+  white-space: nowrap;
+}
+
+@media (max-width: 700px) {
+  .pagination-bar { align-items: flex-start; flex-direction: column; }
 }
 </style>
