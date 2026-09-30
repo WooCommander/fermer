@@ -55,6 +55,7 @@ const formLogin = ref('')
 const formPhone = ref('')
 const formEmail = ref('')
 const formDistrict = ref('Слободзейский район')
+const formDistricts = ref<string[]>([])
 const formFarmName = ref('')
 const formFiscalCode = ref('')
 const formActivityType = ref<ActivityType>('crops')
@@ -69,12 +70,25 @@ const districtsList = [
   'Каменский район',
   'г. Тирасполь',
   'г. Бендеры',
-  'Центральный аппарат (Все районы)',
 ]
 
+// Специалист центрального аппарата видит все районы; в districts это значение 'all'
+const ALL_DISTRICTS = 'all'
+const CENTRAL_LABEL = 'Центральный аппарат (Все районы)'
+
+function getUserDistricts(user: UserAccount): string[] {
+  const list = user.districts?.length ? user.districts : user.district ? [user.district] : []
+  return list.map((district) => (district === CENTRAL_LABEL ? ALL_DISTRICTS : district))
+}
+
+function formatDistricts(districts: string[]): string {
+  if (districts.includes(ALL_DISTRICTS)) return CENTRAL_LABEL
+  return districts.join(', ') || '—'
+}
+
 const availableDistricts = computed(() => Array.from(new Set(props.users
-  .map((user) => user.district)
-  .filter((district): district is string => Boolean(district)))))
+  .flatMap(getUserDistricts)
+  .filter((district) => district !== ALL_DISTRICTS))))
 
 const stats = computed(() => {
   const activeUsers = props.users.filter((u) => !u.deletedAt)
@@ -96,8 +110,11 @@ const filteredUsers = computed(() => {
   const search = searchQuery.value.trim().toLowerCase()
 
   return usersByRole.filter((user) => {
-    const matchesDistrict = filterDistrict.value === 'all' || user.district === filterDistrict.value
-    const matchesSearch = !search || [user.name, user.login, user.phone, user.email, user.district]
+    const userDistricts = getUserDistricts(user)
+    const matchesDistrict = filterDistrict.value === 'all'
+      || userDistricts.includes(filterDistrict.value)
+      || userDistricts.includes(ALL_DISTRICTS)
+    const matchesSearch = !search || [user.name, user.login, user.phone, user.email, formatDistricts(userDistricts)]
       .filter(Boolean)
       .some((value) => value!.toLowerCase().includes(search))
     return matchesDistrict && matchesSearch
@@ -129,6 +146,7 @@ function openCreateModal(role: 'specialist' | 'farmer'): void {
   formPhone.value = ''
   formEmail.value = ''
   formDistrict.value = 'Слободзейский район'
+  formDistricts.value = []
   formFarmName.value = ''
   formFiscalCode.value = ''
   formActivityType.value = 'crops'
@@ -144,7 +162,8 @@ function openEditModal(user: UserAccount): void {
   formLogin.value = user.login
   formPhone.value = user.phone || ''
   formEmail.value = user.email || ''
-  formDistrict.value = user.district || districtsList[0]
+  formDistrict.value = user.district && districtsList.includes(user.district) ? user.district : districtsList[0]
+  formDistricts.value = user.role === 'specialist' ? getUserDistricts(user) : []
 
   const farm = user.farmId ? props.farms.find((item) => item.id === user.farmId) : null
   formFarmName.value = farm?.name || user.name
@@ -152,6 +171,18 @@ function openEditModal(user: UserAccount): void {
   formActivityType.value = farm?.activityType || 'crops'
   formAssignedForms.value = farm ? [...farm.assignedForms] : ['1-фермер']
   showCreateModal.value = true
+}
+
+function toggleSpecialistDistrict(district: string): void {
+  if (district === ALL_DISTRICTS) {
+    formDistricts.value = formDistricts.value.includes(ALL_DISTRICTS) ? [] : [ALL_DISTRICTS]
+    return
+  }
+  const current = formDistricts.value.filter((item) => item !== ALL_DISTRICTS)
+  const idx = current.indexOf(district)
+  if (idx === -1) current.push(district)
+  else current.splice(idx, 1)
+  formDistricts.value = current
 }
 
 function handleFormToggle(code: string): void {
@@ -191,6 +222,10 @@ function onSubmitUser(): void {
     formError.value = 'Укажите корректный email'
     return
   }
+  if (modalRole.value === 'specialist' && formDistricts.value.length === 0) {
+    formError.value = 'Выберите хотя бы один район для регистратора'
+    return
+  }
   if (modalRole.value === 'farmer') {
     if (!formFarmName.value.trim()) {
       formError.value = 'Укажите наименование хозяйства'
@@ -212,8 +247,8 @@ function onSubmitUser(): void {
     role: modalRole.value,
     phone,
     email,
-    district: formDistrict.value,
-    districts: modalRole.value === 'specialist' ? [formDistrict.value] : undefined,
+    district: modalRole.value === 'specialist' ? formatDistricts(formDistricts.value) : formDistrict.value,
+    districts: modalRole.value === 'specialist' ? [...formDistricts.value] : undefined,
   }
 
   if (modalRole.value === 'farmer') {
@@ -355,7 +390,7 @@ function onSubmitUser(): void {
                 {{ user.role === 'admin' ? 'Администратор' : user.role === 'specialist' ? 'Специалист' : 'Фермер' }}
               </span>
             </td>
-            <td>{{ user.district || '—' }}</td>
+            <td>{{ formatDistricts(getUserDistricts(user)) }}</td>
             <td>{{ user.phone || '—' }}</td>
             <td>
               <div class="status-cell">
@@ -454,8 +489,31 @@ function onSubmitUser(): void {
             />
           </div>
 
-          <div class="form-field-group">
-            <label>Район / Подразделение:</label>
+          <div v-if="modalRole === 'specialist'" class="form-field-group">
+            <label>Районы, доступные регистратору:</label>
+            <div class="forms-checkboxes">
+              <label class="cb-label">
+                <input
+                  type="checkbox"
+                  :checked="formDistricts.includes(ALL_DISTRICTS)"
+                  @change="toggleSpecialistDistrict(ALL_DISTRICTS)"
+                />
+                <span>{{ CENTRAL_LABEL }}</span>
+              </label>
+              <label v-for="d in districtsList" :key="d" class="cb-label">
+                <input
+                  type="checkbox"
+                  :checked="formDistricts.includes(d) || formDistricts.includes(ALL_DISTRICTS)"
+                  :disabled="formDistricts.includes(ALL_DISTRICTS)"
+                  @change="toggleSpecialistDistrict(d)"
+                />
+                <span>{{ d }}</span>
+              </label>
+            </div>
+          </div>
+
+          <div v-else class="form-field-group">
+            <label>Район:</label>
             <select v-model="formDistrict" class="custom-select">
               <option v-for="d in districtsList" :key="d" :value="d">{{ d }}</option>
             </select>

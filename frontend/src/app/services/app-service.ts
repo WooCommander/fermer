@@ -75,7 +75,8 @@ export class AppService {
       this.authState.setCurrentFarm(null)
       await this.loadReviewReports()
       const districts = user.districts ?? (user.district ? [user.district] : [])
-      if (!districts.includes('all')) {
+      const seesAll = districts.includes('all') || districts.some((district) => district.startsWith('Центральный аппарат'))
+      if (!seesAll) {
         this.reviewState.setReports(this.reviewState.state.value.reports.filter((report) => districts.includes(report.district)))
       }
     } else if (user.role === 'admin') {
