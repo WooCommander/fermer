@@ -3,6 +3,7 @@ import { ref, computed } from 'vue'
 import type { FarmProfile, ReportUIModel } from '@/shared/types'
 import { AppBadge, AppButton, AppAlert } from '@/shared/ui'
 import { formatActivityTypeName } from '@/shared/lib'
+import { getFormSchemaByCode } from '../schemas'
 
 interface Props {
   farm: FarmProfile
@@ -17,9 +18,14 @@ const props = withDefaults(defineProps<Props>(), {
 
 const emit = defineEmits<{
   (e: 'openReport', report: ReportUIModel): void
+  (e: 'createReport', formCode: string, year: number): void
 }>()
 
 const activeTab = ref<'active' | 'archive'>('active')
+const showCreateDialog = ref(false)
+const selectedFormCode = ref('')
+const selectedYear = ref(new Date().getFullYear())
+const createError = ref('')
 
 // Текущие отчеты (2026 год)
 const currentReports = computed(() => {
@@ -30,6 +36,63 @@ const currentReports = computed(() => {
 const archivedReports = computed(() => {
   return props.reports.filter((r) => r.year < 2026 || r.status === 'approved')
 })
+
+const availableForms = computed(() => {
+  return props.farm.assignedForms
+    .filter((formCode) => !props.reports.some((report) => report.formCode === formCode && report.year === selectedYear.value))
+    .map((formCode) => ({
+      code: formCode,
+      title: getFormSchemaByCode(formCode).title,
+    }))
+})
+
+const createUrgency = computed(() => {
+  const reportYear = new Date().getFullYear()
+  const now = new Date()
+
+  const urgentForms = props.farm.assignedForms
+    .filter((formCode) => !props.reports.some((report) => report.formCode === formCode && report.year === reportYear))
+    .map((formCode) => {
+      const schema = getFormSchemaByCode(formCode)
+      const deadline = schema.submissionDeadline
+      if (!deadline) return null
+
+      const dueDate = new Date(reportYear + (deadline.yearOffset ?? 0), deadline.month - 1, deadline.day, 23, 59, 59)
+      const daysLeft = Math.ceil((dueDate.getTime() - now.getTime()) / 86_400_000)
+      return { formCode, dueDate, daysLeft }
+    })
+    .filter((item): item is { formCode: string; dueDate: Date; daysLeft: number } => item !== null)
+    .filter((item) => item.daysLeft <= 30)
+    .sort((first, second) => first.daysLeft - second.daysLeft)
+
+  const next = urgentForms[0]
+  if (!next) return null
+
+  const deadline = next.dueDate.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })
+  if (next.daysLeft < 0) {
+    return { level: 'overdue', text: `Срок подачи формы ${next.formCode} истёк ${deadline}` }
+  }
+  if (next.daysLeft === 0) {
+    return { level: 'soon', text: `Сегодня последний день подачи формы ${next.formCode}` }
+  }
+  return { level: 'soon', text: `Пора подготовить форму ${next.formCode}: срок ${deadline}` }
+})
+
+function openCreateDialog(): void {
+  selectedFormCode.value = availableForms.value[0]?.code ?? ''
+  createError.value = ''
+  showCreateDialog.value = true
+}
+
+function createReport(): void {
+  if (!selectedFormCode.value) {
+    createError.value = 'Для выбранного периода все назначенные формы уже созданы.'
+    return
+  }
+
+  emit('createReport', selectedFormCode.value, selectedYear.value)
+  showCreateDialog.value = false
+}
 
 function getSummaryKeyMetrics(rep: ReportUIModel): string {
   if (rep.formCode === '1-фермер') {
@@ -87,6 +150,12 @@ function getSummaryKeyMetrics(rep: ReportUIModel): string {
           🗄 Архив сданных отчетов ({{ archivedReports.length }})
         </button>
       </div>
+      <div class="create-report-action">
+        <span v-if="createUrgency" :class="['deadline-hint', `is-${createUrgency.level}`]">{{ createUrgency.text }}</span>
+        <AppButton :variant="createUrgency?.level === 'overdue' ? 'danger' : 'primary'" @click="openCreateDialog">
+          Создать отчёт
+        </AppButton>
+      </div>
     </div>
 
     <!-- 1. ВКЛАДКА: ТЕКУЩИЕ ОТЧЕТЫ (2026 год) -->
@@ -105,7 +174,7 @@ function getSummaryKeyMetrics(rep: ReportUIModel): string {
           <div class="card-top">
             <div class="form-title-group">
               <span class="form-num-badge">Форма {{ rep.formCode }}</span>
-              <h4>{{ rep.formTitle }}</h4>
+              <h4>{{ getFormSchemaByCode(rep.formCode).title }}</h4>
               <span class="period-info">Отчетный период: <b>{{ rep.period }}</b></span>
             </div>
             <AppBadge :status="rep.status" />
@@ -160,7 +229,7 @@ function getSummaryKeyMetrics(rep: ReportUIModel): string {
                 <span class="form-num-badge">Форма {{ rep.formCode }}</span>
                 <span class="year-pill">{{ rep.year }} г.</span>
               </div>
-              <h4>{{ rep.formTitle }}</h4>
+              <h4>{{ getFormSchemaByCode(rep.formCode).title }}</h4>
               <span class="period-info">Период: <b>{{ rep.period }}</b></span>
             </div>
             <AppBadge :status="rep.status" />
@@ -199,6 +268,33 @@ function getSummaryKeyMetrics(rep: ReportUIModel): string {
         <strong>Консультации по статистической отчетности:</strong>
         <p>При возникновении вопросов по заполнению форм или методологии расчетов обращайтесь в отдел статистики вашего района: <b>+373 (533) 9-22-45</b>.</p>
       </div>
+    </div>
+
+    <div v-if="showCreateDialog" class="dialog-backdrop" @click.self="showCreateDialog = false">
+      <section class="create-dialog" role="dialog" aria-modal="true" aria-labelledby="create-report-title">
+        <div class="dialog-header">
+          <h3 id="create-report-title">Создать отчёт</h3>
+          <button type="button" class="close-button" aria-label="Закрыть" @click="showCreateDialog = false">×</button>
+        </div>
+        <p>Выберите назначенную форму и отчётный год. Создастся пустой черновик.</p>
+        <label>
+          Форма
+          <select v-model="selectedFormCode">
+            <option v-for="form in availableForms" :key="form.code" :value="form.code">
+              {{ form.code }} — {{ form.title }}
+            </option>
+          </select>
+        </label>
+        <label>
+          Отчётный год
+          <input v-model.number="selectedYear" type="number" min="2020" max="2100" @change="selectedFormCode = availableForms[0]?.code ?? ''" />
+        </label>
+        <p v-if="createError" class="create-error">{{ createError }}</p>
+        <div class="dialog-actions">
+          <AppButton variant="secondary" @click="showCreateDialog = false">Отмена</AppButton>
+          <AppButton variant="primary" :disabled="!selectedFormCode" @click="createReport">Создать и заполнить</AppButton>
+        </div>
+      </section>
     </div>
   </div>
 </template>
@@ -263,16 +359,65 @@ function getSummaryKeyMetrics(rep: ReportUIModel): string {
 .dashboard-tabs-bar {
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
 }
 
+.create-report-action {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.35rem;
+  flex-shrink: 0;
+}
+
+.deadline-hint {
+  max-width: 250px;
+  color: #a16207;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-align: right;
+}
+
+.deadline-hint.is-overdue { color: #dc2626; }
+
+.dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgba(15, 23, 42, 0.45);
+  z-index: 100;
+}
+
+.create-dialog {
+  width: min(100%, 480px);
+  padding: 1.5rem;
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow: 0 16px 45px rgba(15, 23, 42, 0.24);
+
+  p { margin: 0.45rem 0 1rem; color: #64748b; font-size: 0.9rem; }
+  label { display: flex; flex-direction: column; gap: 0.4rem; margin-top: 0.9rem; color: #334155; font-size: 0.85rem; font-weight: 700; }
+  select, input { width: 100%; box-sizing: border-box; padding: 0.65rem 0.75rem; border: 1px solid #cbd5e1; border-radius: 8px; color: #0f172a; font: inherit; }
+}
+
+.dialog-header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.dialog-header h3 { margin: 0; color: #0f172a; font-size: 1.15rem; }
+.close-button { border: 0; background: transparent; color: #64748b; font-size: 1.5rem; cursor: pointer; line-height: 1; }
+.dialog-actions { display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1.5rem; }
+.create-dialog .create-error { margin: 0.8rem 0 0; color: #dc2626; }
+
 .tabs-group {
+  flex: 1;
   display: flex;
   background: #ffffff;
   border: 1.5px solid #e2e8f0;
   border-radius: 12px;
   padding: 0.3rem;
   gap: 0.35rem;
-  width: 100%;
+  min-width: 0;
 }
 
 .dash-tab-btn {

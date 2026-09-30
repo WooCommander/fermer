@@ -1,4 +1,4 @@
-import type { FarmDto, ReportDto, ReportHistoryEventDto, SaveDraftDto, SubmitReportDto, ReviewReportDto, UserDto, CreateUserDto, UpdateUserDto } from './dto'
+import type { FarmDto, ReportDto, ReportHistoryEventDto, CreateReportDto, SaveDraftDto, SubmitReportDto, ReviewReportDto, UserDto, CreateUserDto, UpdateUserDto } from './dto'
 
 const STORAGE_KEY_REPORTS = 'agrostat_reports_v7'
 const STORAGE_KEY_FARMS = 'agrostat_farms_v7'
@@ -881,6 +881,50 @@ export const httpClient = {
   async getReportById(reportId: string): Promise<ReportDto | null> {
     const all = getStoredReports()
     return Promise.resolve(all.find((r) => r.id === reportId) || null)
+  },
+
+  async createReport(dto: CreateReportDto): Promise<ReportDto> {
+    const farm = getStoredFarms().find((item) => item.id === dto.farm_id)
+    if (!farm) {
+      throw new Error('Farm not found')
+    }
+
+    if (!farm.assigned_forms.includes(dto.form_code)) {
+      throw new Error('Form is not assigned to this farm')
+    }
+
+    const reports = getStoredReports()
+    const exists = reports.some((report) => report.farm_id === dto.farm_id && report.form_code === dto.form_code && report.year === dto.year)
+    if (exists) {
+      throw new Error('Report already exists for this form and period')
+    }
+
+    const previousReport = reports.find((report) => {
+      return report.farm_id === dto.farm_id && report.form_code === dto.form_code && report.year === dto.year - 1
+    })
+    const now = new Date().toISOString()
+    const report: ReportDto = {
+      id: `rep-${Date.now()}`,
+      farm_id: farm.id,
+      farm_name: farm.name,
+      fiscal_code: farm.fiscal_code,
+      district: farm.district,
+      form_code: dto.form_code,
+      form_title: dto.form_code,
+      period: `${dto.year} год`,
+      year: dto.year,
+      status: 'draft',
+      values: {},
+      previous_values: previousReport ? { ...previousReport.values } : {},
+      row_comments: {},
+      confirmed_warnings: {},
+      updated_at: now,
+      deleted_at: null,
+    }
+    report.history = [createHistoryEvent(report, 'created', 'farmer', 'draft')]
+    reports.push(report)
+    saveStoredReports(reports)
+    return Promise.resolve(report)
   },
 
   async saveDraft(dto: SaveDraftDto): Promise<ReportDto> {

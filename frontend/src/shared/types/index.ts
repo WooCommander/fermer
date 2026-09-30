@@ -91,6 +91,11 @@ export interface FormSchema {
   title: string
   periodType: 'annual' | 'quarterly' | 'monthly'
   frequency: string
+  submissionDeadline?: {
+    month: number
+    day: number
+    yearOffset?: number
+  }
   sections: FormSectionSchema[]
   validationRules: ValidationRule[]
 }

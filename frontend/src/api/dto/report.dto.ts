@@ -40,6 +40,12 @@ export interface SaveDraftDto {
   confirmed_warnings?: Record<string, boolean>
 }
 
+export interface CreateReportDto {
+  farm_id: string
+  form_code: string
+  year: number
+}
+
 export interface SubmitReportDto {
   report_id: string
 }

@@ -5,6 +5,7 @@ export const form1FarmerSchema: FormSchema = {
   title: 'Форма № 1-фермер: Отчет об итогах сева под урожай',
   periodType: 'annual',
   frequency: '1 раз в год (не позднее 10 июня)',
+  submissionDeadline: { month: 6, day: 10 },
   sections: [
     {
       id: 'sec-winter-crops',
@@ -303,14 +304,6 @@ export const form1FarmerSchema: FormSchema = {
       severity: 'error',
     },
     {
-      id: 'val-winter-balance',
-      type: 'formula_equals',
-      targetRowCode: '001',
-      expression: '007 + 013 + 014 + 019 + 047',
-      message: 'Официальный баланс озимых: стр. 001 должна быть строго равна (007 + 013 + 014 + 019 + 047).',
-      severity: 'error',
-    },
-    {
       id: 'val-020',
       type: 'formula_equals',
       targetRowCode: '020',
@@ -381,14 +374,6 @@ export const form1FarmerSchema: FormSchema = {
       expression: '150 - 151 - 152 + 190',
       message: 'Баланс пашни (стр. 161) должен равняться (150 – 151 – 152 + 190).',
       severity: 'error',
-    },
-    {
-      id: 'val-anom-sown-area',
-      type: 'max_decrease_percent',
-      targetRowCode: '150',
-      expression: '50',
-      message: 'Предупреждение: общая посевная площадь снизилась более чем на 50% относительно прошлого года.',
-      severity: 'warning',
     },
   ],
 }

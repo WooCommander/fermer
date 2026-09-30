@@ -98,6 +98,16 @@ export class AppService {
     this.reportingState.setActiveReport(null)
   }
 
+  async createReport(formCode: string, year: number): Promise<void> {
+    const farm = this.authState.state.value.currentFarm
+    if (!farm) return
+
+    const report = await reportingService.createReport(farm.id, formCode, year)
+    this.reportingState.addReport(report)
+    this.reportingState.setActiveReport(report)
+    this.validateCurrentReport()
+  }
+
   setSectionIndex(index: number): void {
     this.reportingState.setActiveSectionIndex(index)
   }

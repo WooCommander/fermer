@@ -30,6 +30,18 @@ export class ReportingService {
     return toReportUIModel(dto)
   }
 
+  async createReport(farmId: string, formCode: string, year: number): Promise<ReportUIModel> {
+    const dto = await httpClient.createReport({
+      farm_id: farmId,
+      form_code: formCode,
+      year,
+    })
+    const report = toReportUIModel(dto)
+    const schema = getFormSchemaByCode(formCode)
+    report.formTitle = schema.title
+    return report
+  }
+
   recalculateFormValues(formCode: string, values: Record<string, number | null>): Record<string, number | null> {
     const schema = getFormSchemaByCode(formCode)
     const nextValues = { ...values }

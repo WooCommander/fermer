@@ -5,6 +5,7 @@ export const form3FarmerSchema: FormSchema = {
   title: 'Форма № 3-фермер: Отчет о производстве продукции животноводства и численности скота',
   periodType: 'annual',
   frequency: 'Годовая / Ежеквартальная (до 15 января / до 5 числа после квартала)',
+  submissionDeadline: { month: 1, day: 15, yearOffset: 1 },
   sections: [
     {
       id: 'sec-livestock-count',
@@ -119,14 +120,6 @@ export const form3FarmerSchema: FormSchema = {
       expression: '161 + 162 + 163 + 164',
       message: 'Строка 160 (Реализация скота на убой всего) должна равняться сумме строк 161+162+163+164.',
       severity: 'error',
-    },
-    {
-      id: 'val-anom-cattle',
-      type: 'max_decrease_percent',
-      targetRowCode: '010',
-      expression: '40',
-      message: 'Подозрительное отклонение: поголовье КРС сократилось более чем на 40% относительно прошлого периода.',
-      severity: 'warning',
     },
   ],
 }

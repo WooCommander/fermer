@@ -50,6 +50,10 @@ function onOpenReport(report: ReportUIModel): void {
   appService.openReport(report)
 }
 
+function onCreateReport(formCode: string, year: number): void {
+  appService.createReport(formCode, year)
+}
+
 function onUpdateSectionIndex(index: number): void {
   appService.setSectionIndex(index)
 }
@@ -172,6 +176,7 @@ function onRestoreAdminUser(userId: string): void {
           :farm="currentFarm"
           :reports="reportingState.state.value.reports"
           @open-report="onOpenReport"
+          @create-report="onCreateReport"
         />
       </template>
 

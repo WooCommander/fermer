@@ -5,6 +5,7 @@ export const form2FarmerSchema: FormSchema = {
   title: 'Форма № 2-фермер: Сбор урожая сельскохозяйственных культур',
   periodType: 'annual',
   frequency: '1 раз в год (до 1 декабря)',
+  submissionDeadline: { month: 12, day: 1 },
   sections: [
     {
       id: 'sec-harvest-grain',

@@ -30,6 +30,9 @@ export const useReportingState = () => ({
       state.activeSectionIndex = 0
     }
   },
+  addReport(report: ReportUIModel) {
+    state.reports = [report, ...state.reports]
+  },
   setActiveReport(report: ReportUIModel | null) {
     state.activeReport = report
     state.activeSectionIndex = 0
