@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import type { ReportUIModel } from '@/shared/types'
 import { AppBadge, AppButton } from '@/shared/ui'
 import { downloadCsv, formatStatusName } from '@/shared/lib'
@@ -31,11 +31,15 @@ const districts = computed(() => {
   const set = new Set(props.reports.map((r) => r.district))
   return ['all', ...Array.from(set)]
 })
+const selectedYear = ref(new Date().getFullYear())
+const expandedFarmIds = ref<string[]>([])
+const years = computed(() => Array.from(new Set(props.reports.map((report) => report.year))).sort((first, second) => second - first))
 
 const filteredReports = computed(() => {
   const priority: Record<string, number> = { submitted: 0, needs_revision: 1, in_progress: 2, draft: 2, approved: 3 }
   return props.reports.filter((r) => {
     const matchDistrict = props.filterDistrict === 'all' || r.district === props.filterDistrict
+    const matchYear = report.year === selectedYear.value
     const matchStatus = props.filterStatus === 'all'
       || r.status === props.filterStatus
       || (props.filterStatus === 'not_submitted' && (r.status === 'draft' || r.status === 'in_progress'))
@@ -44,9 +48,21 @@ const filteredReports = computed(() => {
       r.farmName.toLowerCase().includes(props.filterSearch.toLowerCase()) ||
       r.fiscalCode.includes(props.filterSearch) ||
       r.formCode.toLowerCase().includes(props.filterSearch.toLowerCase())
-    return matchDistrict && matchStatus && matchSearch
+    return matchDistrict && matchYear && matchStatus && matchSearch
   }).sort((first, second) => priority[first.status] - priority[second.status] || new Date(second.updatedAt).getTime() - new Date(first.updatedAt).getTime())
 })
+
+const farmGroups = computed(() => {
+  const groups = new Map<string, ReportUIModel[]>()
+  for (const report of filteredReports.value) groups.set(report.farmId, [...(groups.get(report.farmId) ?? []), report])
+  return Array.from(groups.values())
+})
+
+function toggleFarm(farmId: string): void {
+  const index = expandedFarmIds.value.indexOf(farmId)
+  if (index === -1) expandedFarmIds.value.push(farmId)
+  else expandedFarmIds.value.splice(index, 1)
+}
 
 const stats = computed(() => {
   const total = props.reports.length
@@ -101,7 +117,7 @@ function exportFilteredReports(): void {
 
     <!-- Панель фильтров -->
     <div class="filters-row">
-      <div class="filter-group">
+      <div v-if="districts.length > 2" class="filter-group">
         <label>Поиск по хозяйству / фискальному коду:</label>
         <input
           :value="props.filterSearch"
@@ -110,6 +126,13 @@ function exportFilteredReports(): void {
           class="filter-input"
           @input="emit('updateSearch', ($event.target as HTMLInputElement).value)"
         />
+      </div>
+
+      <div class="filter-group">
+        <label>Год:</label>
+        <select v-model.number="selectedYear" class="filter-select">
+          <option v-for="year in years" :key="year" :value="year">{{ year }}{{ year === new Date().getFullYear() ? ' (текущий)' : '' }}</option>
+        </select>
       </div>
 
       <div class="filter-group">

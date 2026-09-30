@@ -774,7 +774,7 @@ export const httpClient = {
         farm_name: newFarm.name,
         fiscal_code: newFarm.fiscal_code,
         district: newFarm.district,
-        form_code: '1-фермер',
+        form_code: newFarm.assigned_forms[0] || '1-фермер',
         form_title: 'Отчет об итогах сева под урожай',
         period: '2026 год',
         year: 2026,
@@ -788,6 +788,17 @@ export const httpClient = {
       }
       newReport.history = [createHistoryEvent(newReport, 'created', 'system', 'draft')]
       reports.push(newReport)
+      for (const [index, formCode] of newFarm.assigned_forms.slice(1).entries()) {
+        const additionalReport: ReportDto = {
+          ...newReport,
+          id: `rep-${Date.now()}-${index + 1}`,
+          form_code: formCode,
+          form_title: formCode,
+          history: [],
+        }
+        additionalReport.history = [createHistoryEvent(additionalReport, 'created', 'system', 'draft')]
+        reports.push(additionalReport)
+      }
       saveStoredReports(reports)
     }
 
