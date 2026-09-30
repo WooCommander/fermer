@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
-import type { ReportUIModel, FormSchema } from '@/shared/types'
+import { ref, reactive, computed } from 'vue'
+import type { ReportUIModel, FormSchema, RevisionRow } from '@/shared/types'
 import { AppButton, AppBadge, AppAlert, AppConfirmDialog } from '@/shared/ui'
 import { getFormSchemaByCode } from '@/modules/reporting/schemas'
 import ReportHistoryTimeline from '@/modules/reporting/ui/ReportHistoryTimeline.vue'
@@ -15,7 +15,7 @@ const props = defineProps<Props>()
 const emit = defineEmits<{
   (e: 'back'): void
   (e: 'approve', reportId: string): void
-  (e: 'returnRevision', reportId: string, comment: string): void
+  (e: 'returnRevision', reportId: string, comment: string, rows: RevisionRow[]): void
 }>()
 
 const schema = computed<FormSchema>(() => {
@@ -31,6 +31,22 @@ const showApproveConfirm = ref(false)
 const showRevisionConfirm = ref(false)
 const revisionComment = ref(props.report.revisionComment || '')
 
+// Строки, отмеченные к уточнению: код -> замечание по строке (пустая строка = без пояснения)
+const flaggedRows = reactive<Record<string, string>>({})
+for (const row of props.report.revisionRows ?? []) flaggedRows[row.rowCode] = row.comment ?? ''
+
+const canFlagRows = computed(() => props.report.status !== 'approved')
+const flaggedCount = computed(() => Object.keys(flaggedRows).length)
+
+function isFlagged(code: string): boolean {
+  return code in flaggedRows
+}
+
+function toggleFlag(code: string): void {
+  if (isFlagged(code)) delete flaggedRows[code]
+  else flaggedRows[code] = ''
+}
+
 function onApproveConfirm(): void {
   showApproveConfirm.value = false
   emit('approve', props.report.id)
@@ -39,7 +55,8 @@ function onApproveConfirm(): void {
 function onSendRevisionConfirm(): void {
   showRevisionConfirm.value = false
   if (revisionComment.value.trim()) {
-    emit('returnRevision', props.report.id, revisionComment.value)
+    const rows: RevisionRow[] = Object.entries(flaggedRows).map(([rowCode, comment]) => ({ rowCode, comment: comment.trim() || undefined }))
+    emit('returnRevision', props.report.id, revisionComment.value, rows)
     showRevisionBox.value = false
   }
 }
@@ -96,13 +113,14 @@ function onSendRevisionConfirm(): void {
               <th style="width: 80px;">Ед. изм.</th>
               <th style="width: 120px; text-align: right;">Прошлый год</th>
               <th>Комментарий фермера</th>
+              <th v-if="canFlagRows" class="flag-head">Уточнить</th>
             </tr>
           </thead>
           <tbody>
             <tr
               v-for="r in sec.rows"
               :key="r.code"
-              :class="{ 'is-calc': r.isCalculated, 'has-indent': (r.indent ?? 0) > 0 }"
+              :class="{ 'is-calc': r.isCalculated, 'has-indent': (r.indent ?? 0) > 0, 'is-flagged': isFlagged(r.code) }"
             >
               <td class="code-col"><code>{{ r.code }}</code></td>
               <td>{{ r.title }}</td>
@@ -117,6 +135,19 @@ function onSendRevisionConfirm(): void {
                 </span>
                 <span v-else class="no-comment">—</span>
               </td>
+              <td v-if="canFlagRows" class="flag-col">
+                <label class="flag-toggle">
+                  <input type="checkbox" :checked="isFlagged(r.code)" @change="toggleFlag(r.code)" />
+                  <span>Вернуть</span>
+                </label>
+                <input
+                  v-if="isFlagged(r.code)"
+                  v-model="flaggedRows[r.code]"
+                  type="text"
+                  class="flag-note"
+                  placeholder="Что уточнить?"
+                />
+              </td>
             </tr>
           </tbody>
         </table>
@@ -126,6 +157,7 @@ function onSendRevisionConfirm(): void {
     <!-- Панель действий инспектора -->
     <div class="actions-footer">
       <div v-if="!showRevisionBox" class="footer-buttons">
+        <span v-if="canFlagRows && flaggedCount > 0" class="flagged-counter">Отмечено строк: {{ flaggedCount }}</span>
         <AppButton
           v-if="props.report.status !== 'approved'"
           variant="danger"
@@ -146,6 +178,9 @@ function onSendRevisionConfirm(): void {
       </div>
 
       <div v-else class="revision-form">
+        <p class="flagged-summary">
+          {{ flaggedCount > 0 ? `Фермеру будут подсвечены строки: ${Object.keys(flaggedRows).join(', ')}` : 'Строки не отмечены: фермер получит только текст замечания. Отметьте строки в таблице колонкой «Уточнить».' }}
+        </p>
         <label>
           <b>Причина возврата отчета на уточнение:</b>
           <textarea
@@ -317,6 +352,54 @@ function onSendRevisionConfirm(): void {
   tr.has-indent td:nth-child(2) {
     padding-left: 1.75rem;
   }
+}
+
+tr.is-flagged td {
+  background: #fff7ed;
+}
+
+.flag-head,
+.flag-col {
+  width: 210px;
+}
+
+.flag-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #b45309;
+  cursor: pointer;
+
+  input {
+    accent-color: #f59e0b;
+  }
+}
+
+.flag-note {
+  width: 100%;
+  margin-top: 0.3rem;
+  box-sizing: border-box;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid #fcd34d;
+  border-radius: 6px;
+  font: inherit;
+  font-size: 0.8rem;
+}
+
+.flagged-counter {
+  align-self: center;
+  margin-right: auto;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #b45309;
+}
+
+.flagged-summary {
+  margin: 0 0 0.6rem;
+  font-size: 0.82rem;
+  color: #64748b;
 }
 
 .code-col code {

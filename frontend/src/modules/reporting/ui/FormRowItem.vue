@@ -10,6 +10,8 @@ interface Props {
   hasError?: boolean
   hasWarning?: boolean
   readonly?: boolean
+  // Замечание специалиста по строке: null — строка не отмечена, '' — отмечена без пояснения
+  revisionNote?: string | null
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -19,6 +21,7 @@ const props = withDefaults(defineProps<Props>(), {
   hasError: false,
   hasWarning: false,
   readonly: false,
+  revisionNote: null,
 })
 
 const emit = defineEmits<{
@@ -86,6 +89,7 @@ function copyPreviousValue(): void {
         'is-calc': props.row.isCalculated,
         'has-error': props.hasError,
         'has-warning': props.hasWarning,
+        'needs-revision': props.revisionNote !== null,
         'has-significant-deviation': deviation,
         'has-increase': deviation?.direction === 'increase',
         'has-decrease': deviation?.direction === 'decrease',
@@ -104,6 +108,9 @@ function copyPreviousValue(): void {
       <div class="title-cell-content">
         <span class="row-name">{{ props.row.title }}</span>
         <span v-if="props.row.hint" class="row-hint-inline">{{ props.row.hint }}</span>
+        <span v-if="props.revisionNote !== null" class="revision-note">
+          ↩ Уточните{{ props.revisionNote ? `: ${props.revisionNote}` : '' }}
+        </span>
       </div>
     </td>
 
@@ -205,6 +212,11 @@ function copyPreviousValue(): void {
     background-color: #fffbeb !important;
   }
 
+  &.needs-revision {
+    background-color: #fff7ed;
+    box-shadow: inset 4px 0 0 #f59e0b;
+  }
+
   &.has-significant-deviation:not(.has-error):not(.has-warning) {
     &.has-increase {
       background-color: #eff6ff;
@@ -251,6 +263,12 @@ td {
 .row-name {
   color: #1e293b;
   line-height: 1.35;
+}
+
+.revision-note {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #b45309;
 }
 
 .row-hint-inline {

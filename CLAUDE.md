@@ -27,7 +27,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### Формы как данные
 
-Отчётные формы описаны декларативно в `modules/reporting/schemas/form-N-farmer.schema.ts` и регистрируются в `registeredSchemas` по коду (`'1-фермер'` и т.д.). Секция формы содержит строки с трёхзначными кодами (`'001'`). Поле `activityGroup` (`crops`/`livestock`/`all`) определяет, какие секции видит хозяйство, в зависимости от его `activity_type`. Какие формы хозяйство сдаёт, задаёт `assigned_forms` у хозяйства.
+Отчётные формы описаны декларативно в `modules/reporting/schemas/form-N-farmer.schema.ts` и регистрируются в `registeredSchemas` по коду (`'1-фермер'` и т.д.). Секция формы содержит строки с трёхзначными кодами (`'001'`). Поле `activityGroup` (`crops`/`livestock`/`all`) предназначено для скрытия секций по `activity_type` хозяйства, но в UI пока не применяется: форма показывает все секции. Какие формы хозяйство сдаёт, задаёт `assigned_forms` у хозяйства.
 
 - Расчётные строки: `isCalculated` + `calculationFormula`.
 - Контроли: `validationRules` с типами `formula_equals|gte|lte`, `max_decrease_percent`, `required_if` и уровнем `error`/`warning`. Предупреждения фермер может подтвердить (`confirmedWarnings`).

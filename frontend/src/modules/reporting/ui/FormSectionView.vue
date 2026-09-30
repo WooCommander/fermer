@@ -11,6 +11,7 @@ interface Props {
   rowComments: Record<string, string>
   issues: ValidationIssue[]
   readonly?: boolean
+  revisionNotes?: Record<string, string>
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -19,6 +20,7 @@ const props = withDefaults(defineProps<Props>(), {
   rowComments: () => ({}),
   issues: () => [],
   readonly: false,
+  revisionNotes: () => ({}),
 })
 
 const emit = defineEmits<{
@@ -102,6 +104,7 @@ function hasRowWarning(rowCode: string): boolean {
             :has-error="hasRowError(row.code)"
             :has-warning="hasRowWarning(row.code)"
             :readonly="props.readonly"
+            :revision-note="props.revisionNotes[row.code] ?? null"
             @update:value="emit('updateRowValue', row.code, $event)"
             @update:comment="emit('updateRowComment', row.code, $event)"
           />

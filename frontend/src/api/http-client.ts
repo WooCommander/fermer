@@ -1075,6 +1075,7 @@ export const httpClient = {
     const updated: ReportDto = {
       ...current,
       status: 'submitted',
+      revision_rows: undefined,
       submitted_at: now,
       updated_at: now,
       history: [
@@ -1100,6 +1101,7 @@ export const httpClient = {
       ...current,
       status: nextStatus,
       revision_comment: dto.action === 'reject' ? dto.revision_comment : undefined,
+      revision_rows: dto.action === 'reject' ? (dto.revision_rows ?? []) : undefined,
       approved_at: dto.action === 'approve' ? now : undefined,
       updated_at: now,
       history: [

@@ -5,7 +5,7 @@ import { adminService, useAdminState } from '@/modules/admin'
 import { httpClient, type CreateUserDto, type UpdateUserDto } from '@/api'
 import { toUserAccount } from '@/modules/admin/adapters/admin.adapter'
 import { toFarmProfile } from '@/modules/auth/adapters/auth.adapter'
-import type { HelpSettings, ReportUIModel } from '@/shared/types'
+import type { HelpSettings, ReportUIModel, RevisionRow } from '@/shared/types'
 import type { ReportFormSettings } from '@/shared/types'
 
 const SESSION_STORAGE_KEY = 'agrostat_auth_user_id'
@@ -322,8 +322,8 @@ export class AppService {
     }
   }
 
-  async returnForRevision(reportId: string, comment: string): Promise<void> {
-    const revised = await reviewService.returnForRevision(reportId, comment)
+  async returnForRevision(reportId: string, comment: string, rows: RevisionRow[] = []): Promise<void> {
+    const revised = await reviewService.returnForRevision(reportId, comment, rows)
     this.reviewState.updateReportInList(revised)
     const active = this.reportingState.state.value.activeReport
     if (active && active.id === reportId) {

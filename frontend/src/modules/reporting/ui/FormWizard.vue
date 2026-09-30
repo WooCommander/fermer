@@ -77,6 +77,17 @@ const filledRowsCount = computed(() => countFilledRows(props.report.values))
 
 const previousFilledRowsCount = computed(() => countFilledRows(props.report.previousValues))
 
+// Строки, которые специалист вернул на уточнение (только пока отчёт ждёт исправлений)
+const revisionNotes = computed<Record<string, string>>(() => {
+  if (props.report.status !== 'needs_revision') return {}
+  return Object.fromEntries((props.report.revisionRows ?? []).map((row) => [row.rowCode, row.comment ?? '']))
+})
+
+const revisionItems = computed(() => {
+  const titles = new Map(props.schema.sections.flatMap((section) => section.rows.map((row) => [row.code, row.title] as const)))
+  return Object.entries(revisionNotes.value).map(([code, comment]) => ({ code, comment, title: titles.get(code) ?? '' }))
+})
+
 const lastSavedTime = computed(() => props.lastSavedAt
   ? new Date(props.lastSavedAt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
   : '')
@@ -89,6 +100,7 @@ const sectionStats = computed(() => props.schema.sections.map((section) => {
   return {
     errors: props.validationIssues.filter((issue) => issue.severity === 'error' && inSection(issue)).length,
     warnings: props.validationIssues.filter((issue) => issue.severity === 'warning' && inSection(issue)).length,
+    revisions: section.rows.filter((row) => row.code in revisionNotes.value).length,
     filled: inputCodes.filter((code) => typeof props.report.values[code] === 'number' && !isNaN(props.report.values[code] as number)).length,
     total: inputCodes.length,
   }
@@ -188,6 +200,7 @@ function onConfirmSubmit(): void {
             <span class="sec-code">{{ sec.code }}</span>
             <span class="sec-name">{{ sec.title.replace(/^[0-9.]+\s*/, '') }}</span>
             <span v-if="sectionStats[idx].errors > 0" class="sec-badge is-error" :title="`Ошибок: ${sectionStats[idx].errors}`">{{ sectionStats[idx].errors }}</span>
+            <span v-else-if="sectionStats[idx].revisions > 0" class="sec-badge is-revision" :title="`Строк к уточнению: ${sectionStats[idx].revisions}`">↩{{ sectionStats[idx].revisions }}</span>
             <span v-else-if="sectionStats[idx].warnings > 0" class="sec-badge is-warning" :title="`Предупреждений: ${sectionStats[idx].warnings}`">!</span>
             <span v-else-if="sectionStats[idx].total > 0 && sectionStats[idx].filled === sectionStats[idx].total" class="sec-badge is-done" title="Раздел заполнен">✓</span>
             <span v-else-if="sectionStats[idx].total > 0" class="sec-badge is-progress" title="Заполнено строк">{{ sectionStats[idx].filled }}/{{ sectionStats[idx].total }}</span>
@@ -248,6 +261,13 @@ function onConfirmSubmit(): void {
         title="Замечание инспектора статистики (требуется исправление)"
       >
         {{ props.report.revisionComment }}
+        <ul v-if="revisionItems.length > 0" class="revision-list">
+          <li v-for="item in revisionItems" :key="item.code">
+            <button type="button" class="link-btn inline" @click="focusRow(item.code)">Строка {{ item.code }} →</button>
+            <span class="revision-row-title">{{ item.title }}</span>
+            <span v-if="item.comment" class="revision-row-comment">{{ item.comment }}</span>
+          </li>
+        </ul>
       </AppAlert>
 
       <!-- Блок сводки ошибок и контрольных соотношений -->
@@ -270,6 +290,7 @@ function onConfirmSubmit(): void {
           :row-comments="props.report.rowComments"
           :issues="props.validationIssues"
           :readonly="isReadonly"
+          :revision-notes="revisionNotes"
           @update-row-value="(rowCode, val) => emit('updateRowValue', rowCode, val)"
           @update-row-comment="(rowCode, comment) => emit('updateRowComment', rowCode, comment)"
           @fill-zeros="emit('fillZerosForSection', currentSection.id)"
@@ -368,6 +389,37 @@ function onConfirmSubmit(): void {
   }
 }
 
+.revision-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin: 0.6rem 0 0;
+  padding: 0;
+  list-style: none;
+
+  li {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.15rem 0.6rem;
+  }
+}
+
+.link-btn.inline {
+  display: inline;
+  margin: 0;
+  white-space: nowrap;
+}
+
+.revision-row-title {
+  color: #475569;
+}
+
+.revision-row-comment {
+  font-weight: 700;
+  color: #b45309;
+}
+
 .save-status {
   font-size: 0.78rem;
   color: #64748b;
@@ -385,6 +437,7 @@ function onConfirmSubmit(): void {
 
   &.is-error { background: #fee2e2; color: #b91c1c; }
   &.is-warning { background: #fef3c7; color: #b45309; }
+  &.is-revision { background: #ffedd5; color: #c2410c; }
   &.is-done { background: #dcfce7; color: #15803d; }
   &.is-progress { background: #f1f5f9; color: #64748b; }
 }

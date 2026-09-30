@@ -142,6 +142,11 @@ export interface ValidationIssue {
   expectedValue?: number | null
 }
 
+export interface RevisionRow {
+  rowCode: string
+  comment?: string
+}
+
 export interface ReportUIModel {
   id: string
   farmId: string
@@ -159,6 +164,7 @@ export interface ReportUIModel {
   confirmedWarnings: Record<string, boolean>
   history: ReportHistoryEvent[]
   revisionComment?: string
+  revisionRows?: RevisionRow[]
   updatedAt: string
   submittedAt?: string
   approvedAt?: string

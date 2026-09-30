@@ -1,5 +1,10 @@
 export type ReportHistoryActionDto = 'created' | 'saved' | 'submitted' | 'returned' | 'approved'
 
+export interface RevisionRowDto {
+  row_code: string
+  comment?: string
+}
+
 export interface ReportHistoryEventDto {
   id: string
   action: ReportHistoryActionDto
@@ -27,6 +32,7 @@ export interface ReportDto {
   confirmed_warnings: Record<string, boolean>
   history?: ReportHistoryEventDto[]
   revision_comment?: string
+  revision_rows?: RevisionRowDto[]
   updated_at: string
   submitted_at?: string
   approved_at?: string
@@ -56,4 +62,5 @@ export interface ReviewReportDto {
   report_id: string
   action: 'approve' | 'reject'
   revision_comment?: string
+  revision_rows?: RevisionRowDto[]
 }

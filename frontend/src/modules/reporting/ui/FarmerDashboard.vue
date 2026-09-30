@@ -260,6 +260,7 @@ function getSummaryKeyMetrics(rep: ReportUIModel): string {
             title="Замечание инспектора статистики (требуется уточнение)"
           >
             {{ rep.revisionComment }}
+            <span v-if="rep.revisionRows?.length" class="revision-rows-hint">Строк к уточнению: {{ rep.revisionRows.length }}</span>
           </AppAlert>
 
           <div class="card-bottom">
@@ -518,6 +519,12 @@ function getSummaryKeyMetrics(rep: ReportUIModel): string {
 .close-button { border: 0; background: transparent; color: #64748b; font-size: 1.5rem; cursor: pointer; line-height: 1; }
 .dialog-actions { display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1.5rem; }
 .create-dialog .contacts-error { margin: 0.8rem 0 0; color: #dc2626; }
+
+.revision-rows-hint {
+  display: block;
+  margin-top: 0.3rem;
+  font-weight: 700;
+}
 
 .deadline-line {
   font-size: 0.82rem;

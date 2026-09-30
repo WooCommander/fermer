@@ -5,7 +5,7 @@ import { useAuthState, AuthLoginForm } from '@/modules/auth'
 import { useReportingState, getFormSchemaByCode, FormWizard, FarmerDashboard, reportingService } from '@/modules/reporting'
 import { useReviewState, ReportReviewList, ReportReviewDetail } from '@/modules/review'
 import { useAdminState, AdminUserManagement, AdminReportSettings, AdminHelpSettings } from '@/modules/admin'
-import type { HelpSettings, ReportFormSettings, ReportUIModel } from '@/shared/types'
+import type { HelpSettings, ReportFormSettings, ReportUIModel, RevisionRow } from '@/shared/types'
 import type { CreateUserDto, UpdateUserDto } from '@/api'
 
 const authState = useAuthState()
@@ -104,8 +104,8 @@ function onApproveReport(reportId: string): void {
   appService.approveReport(reportId)
 }
 
-function onReturnRevision(reportId: string, comment: string): void {
-  appService.returnForRevision(reportId, comment)
+function onReturnRevision(reportId: string, comment: string, rows: RevisionRow[]): void {
+  appService.returnForRevision(reportId, comment, rows)
 }
 
 // Admin (Администратор)
