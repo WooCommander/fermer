@@ -1,5 +1,5 @@
 import type { ReportDto } from '@/api'
-import type { ReportUIModel, ReportStatus } from '@/shared/types'
+import type { ReportHistoryAction, ReportStatus, ReportUIModel } from '@/shared/types'
 
 export function toReportUIModel(dto: ReportDto): ReportUIModel {
   return {
@@ -17,6 +17,15 @@ export function toReportUIModel(dto: ReportDto): ReportUIModel {
     previousValues: { ...dto.previous_values },
     rowComments: { ...dto.row_comments },
     confirmedWarnings: { ...dto.confirmed_warnings },
+    history: (dto.history ?? []).map((event) => ({
+      id: event.id,
+      action: event.action as ReportHistoryAction,
+      actor: event.actor,
+      createdAt: event.created_at,
+      fromStatus: event.from_status as ReportStatus | undefined,
+      toStatus: event.to_status as ReportStatus,
+      comment: event.comment,
+    })),
     revisionComment: dto.revision_comment,
     updatedAt: dto.updated_at,
     submittedAt: dto.submitted_at,

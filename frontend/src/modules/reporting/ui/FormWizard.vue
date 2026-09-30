@@ -5,6 +5,7 @@ import { AppButton, AppProgressBar, AppBadge, AppAlert } from '@/shared/ui'
 import FormSectionView from './FormSectionView.vue'
 import ValidationSummary from './ValidationSummary.vue'
 import ReportSubmitDialog from './ReportSubmitDialog.vue'
+import ReportHistoryTimeline from './ReportHistoryTimeline.vue'
 
 interface Props {
   report: ReportUIModel
@@ -202,6 +203,8 @@ function onConfirmSubmit(): void {
       />
 
       <!-- Табличный блок активного раздела -->
+      <ReportHistoryTimeline :history="props.report.history" />
+
       <div class="data-grid-container">
         <FormSectionView
           :section="currentSection"

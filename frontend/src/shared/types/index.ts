@@ -21,6 +21,18 @@ export type ReportStatus =
   | 'needs_revision'
   | 'approved'
 
+export type ReportHistoryAction = 'created' | 'saved' | 'submitted' | 'returned' | 'approved'
+
+export interface ReportHistoryEvent {
+  id: string
+  action: ReportHistoryAction
+  actor: 'farmer' | 'specialist' | 'system'
+  createdAt: string
+  fromStatus?: ReportStatus
+  toStatus: ReportStatus
+  comment?: string
+}
+
 export type ActivityType = 'crops' | 'livestock' | 'mixed'
 
 export interface KeyValuePair<T = unknown> {
@@ -116,6 +128,7 @@ export interface ReportUIModel {
   previousValues: Record<string, number | null>
   rowComments: Record<string, string>
   confirmedWarnings: Record<string, boolean>
+  history: ReportHistoryEvent[]
   revisionComment?: string
   updatedAt: string
   submittedAt?: string

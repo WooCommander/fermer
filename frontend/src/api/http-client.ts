@@ -1,4 +1,4 @@
-import type { FarmDto, ReportDto, SaveDraftDto, SubmitReportDto, ReviewReportDto, UserDto, CreateUserDto, UpdateUserDto } from './dto'
+import type { FarmDto, ReportDto, ReportHistoryEventDto, SaveDraftDto, SubmitReportDto, ReviewReportDto, UserDto, CreateUserDto, UpdateUserDto } from './dto'
 
 const STORAGE_KEY_REPORTS = 'agrostat_reports_v7'
 const STORAGE_KEY_FARMS = 'agrostat_farms_v7'
@@ -547,14 +547,51 @@ const initialReports: ReportDto[] = [
   },
 ]
 
+function createHistoryEvent(
+  report: ReportDto,
+  action: ReportHistoryEventDto['action'],
+  actor: ReportHistoryEventDto['actor'],
+  toStatus: string,
+  fromStatus?: string,
+  comment?: string,
+): ReportHistoryEventDto {
+  return {
+    id: `history-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    action,
+    actor,
+    created_at: new Date().toISOString(),
+    from_status: fromStatus,
+    to_status: toStatus,
+    comment,
+  }
+}
+
+function ensureReportHistory(report: ReportDto): ReportDto {
+  if (report.history?.length) {
+    return report
+  }
+
+  return {
+    ...report,
+    history: [{
+      id: `history-created-${report.id}`,
+      action: 'created',
+      actor: 'system',
+      created_at: report.updated_at,
+      to_status: report.status,
+    }],
+  }
+}
+
 function getStoredReports(): ReportDto[] {
   const data = localStorage.getItem(STORAGE_KEY_REPORTS)
   if (!data) {
-    localStorage.setItem(STORAGE_KEY_REPORTS, JSON.stringify(initialReports))
-    return initialReports
+    const reports = initialReports.map(ensureReportHistory)
+    localStorage.setItem(STORAGE_KEY_REPORTS, JSON.stringify(reports))
+    return reports
   }
   try {
-    const parsed = JSON.parse(data) as ReportDto[]
+    let parsed = JSON.parse(data) as ReportDto[]
     const existingIds = new Set(parsed.map((r) => r.id))
     let hasChanges = false
     for (const initRep of initialReports) {
@@ -563,12 +600,17 @@ function getStoredReports(): ReportDto[] {
         hasChanges = true
       }
     }
+    const reportsWithHistory = parsed.map(ensureReportHistory)
+    if (reportsWithHistory.some((report, index) => report !== parsed[index])) {
+      parsed = reportsWithHistory
+      hasChanges = true
+    }
     if (hasChanges) {
       localStorage.setItem(STORAGE_KEY_REPORTS, JSON.stringify(parsed))
     }
     return parsed
   } catch {
-    return initialReports
+    return initialReports.map(ensureReportHistory)
   }
 }
 
@@ -703,6 +745,7 @@ export const httpClient = {
         updated_at: new Date().toISOString(),
         deleted_at: null,
       }
+      newReport.history = [createHistoryEvent(newReport, 'created', 'system', 'draft')]
       reports.push(newReport)
       saveStoredReports(reports)
     }
@@ -847,13 +890,19 @@ export const httpClient = {
       throw new Error(`Report not found: ${dto.report_id}`)
     }
     const current = all[index]
+    const now = new Date().toISOString()
+    const nextStatus = current.status === 'draft' ? 'in_progress' : current.status
     const updated: ReportDto = {
       ...current,
       values: { ...dto.values },
       row_comments: dto.row_comments ? { ...dto.row_comments } : current.row_comments,
       confirmed_warnings: dto.confirmed_warnings ? { ...dto.confirmed_warnings } : current.confirmed_warnings,
-      status: current.status === 'draft' ? 'in_progress' : current.status,
-      updated_at: new Date().toISOString(),
+      status: nextStatus,
+      updated_at: now,
+      history: [
+        ...(ensureReportHistory(current).history ?? []),
+        createHistoryEvent(current, 'saved', 'farmer', nextStatus, current.status),
+      ],
     }
     all[index] = updated
     saveStoredReports(all)
@@ -866,11 +915,17 @@ export const httpClient = {
     if (index === -1) {
       throw new Error(`Report not found: ${dto.report_id}`)
     }
+    const current = all[index]
+    const now = new Date().toISOString()
     const updated: ReportDto = {
-      ...all[index],
+      ...current,
       status: 'submitted',
-      submitted_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
+      submitted_at: now,
+      updated_at: now,
+      history: [
+        ...(ensureReportHistory(current).history ?? []),
+        createHistoryEvent(current, 'submitted', 'farmer', 'submitted', current.status),
+      ],
     }
     all[index] = updated
     saveStoredReports(all)
@@ -883,12 +938,26 @@ export const httpClient = {
     if (index === -1) {
       throw new Error(`Report not found: ${dto.report_id}`)
     }
+    const current = all[index]
+    const now = new Date().toISOString()
+    const nextStatus = dto.action === 'approve' ? 'approved' : 'needs_revision'
     const updated: ReportDto = {
-      ...all[index],
-      status: dto.action === 'approve' ? 'approved' : 'needs_revision',
+      ...current,
+      status: nextStatus,
       revision_comment: dto.action === 'reject' ? dto.revision_comment : undefined,
-      approved_at: dto.action === 'approve' ? new Date().toISOString() : undefined,
-      updated_at: new Date().toISOString(),
+      approved_at: dto.action === 'approve' ? now : undefined,
+      updated_at: now,
+      history: [
+        ...(ensureReportHistory(current).history ?? []),
+        createHistoryEvent(
+          current,
+          dto.action === 'approve' ? 'approved' : 'returned',
+          'specialist',
+          nextStatus,
+          current.status,
+          dto.action === 'reject' ? dto.revision_comment : undefined,
+        ),
+      ],
     }
     all[index] = updated
     saveStoredReports(all)

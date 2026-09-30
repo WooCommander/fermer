@@ -30,6 +30,31 @@ const stringValue = computed(() => {
   return props.value !== null && props.value !== undefined ? props.value.toString() : ''
 })
 
+const deviation = computed(() => {
+  if (typeof props.value !== 'number' || typeof props.previousValue !== 'number' || props.previousValue === 0) {
+    return null
+  }
+
+  const percent = ((props.value - props.previousValue) / Math.abs(props.previousValue)) * 100
+  if (Math.abs(percent) < 20) {
+    return null
+  }
+
+  return {
+    percent,
+    direction: percent > 0 ? 'increase' : 'decrease',
+  }
+})
+
+const deviationLabel = computed(() => {
+  if (!deviation.value) {
+    return ''
+  }
+
+  const sign = deviation.value.percent > 0 ? '+' : '−'
+  return `${sign}${Math.abs(deviation.value.percent).toFixed(1)}% к прошлому периоду`
+})
+
 function onInputChange(e: Event): void {
   const val = (e.target as HTMLInputElement).value
   if (val.trim() === '') {
@@ -60,6 +85,9 @@ function copyPreviousValue(): void {
         'is-calc': props.row.isCalculated,
         'has-error': props.hasError,
         'has-warning': props.hasWarning,
+        'has-significant-deviation': deviation,
+        'has-increase': deviation?.direction === 'increase',
+        'has-decrease': deviation?.direction === 'decrease',
         'has-indent-1': props.row.indent === 1,
         'has-indent-2': props.row.indent === 2,
       },
@@ -97,7 +125,7 @@ function copyPreviousValue(): void {
 
     <!-- Ввод значения / Авторасчет -->
     <td class="col-input">
-      <div class="input-cell-box">
+      <div :class="['input-cell-box', { 'has-significant-deviation': deviation }]">
         <input
           :value="stringValue"
           :readonly="props.row.isCalculated || props.readonly"
@@ -111,6 +139,13 @@ function copyPreviousValue(): void {
         />
         <span class="unit-tag">{{ props.row.unit }}</span>
       </div>
+      <span
+        v-if="deviation"
+        :class="['deviation-note', `is-${deviation.direction}`]"
+        :title="`Текущее значение ${deviation.direction === 'increase' ? 'выше' : 'ниже'} прошлого на ${Math.abs(deviation.percent).toFixed(1)}%`"
+      >
+        {{ deviationLabel }}
+      </span>
     </td>
 
     <!-- Комментарий фермера к строке -->
@@ -166,6 +201,16 @@ function copyPreviousValue(): void {
 
   &.has-warning {
     background-color: #fffbeb !important;
+  }
+
+  &.has-significant-deviation:not(.has-error):not(.has-warning) {
+    &.has-increase {
+      background-color: #eff6ff;
+    }
+
+    &.has-decrease {
+      background-color: #fff7ed;
+    }
   }
 }
 
@@ -260,6 +305,10 @@ td {
   display: flex;
   align-items: center;
   position: relative;
+
+  &.has-significant-deviation .grid-number-input {
+    border-width: 2px;
+  }
 }
 
 .grid-number-input {
@@ -297,6 +346,22 @@ td {
   font-weight: 600;
   color: #64748b;
   pointer-events: none;
+}
+
+.deviation-note {
+  display: block;
+  margin-top: 0.2rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-align: right;
+
+  &.is-increase {
+    color: #2563eb;
+  }
+
+  &.is-decrease {
+    color: #c2410c;
+  }
 }
 
 .col-comment {

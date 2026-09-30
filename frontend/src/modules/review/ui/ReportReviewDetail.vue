@@ -3,6 +3,7 @@ import { ref, computed } from 'vue'
 import type { ReportUIModel, FormSchema } from '@/shared/types'
 import { AppButton, AppBadge, AppAlert, AppConfirmDialog } from '@/shared/ui'
 import { getFormSchemaByCode } from '@/modules/reporting/schemas'
+import ReportHistoryTimeline from '@/modules/reporting/ui/ReportHistoryTimeline.vue'
 import { validateFormValues } from '@/shared/lib'
 
 interface Props {
@@ -68,6 +69,8 @@ function onSendRevisionConfirm(): void {
     </div>
 
     <!-- Замечания и проблемы -->
+    <ReportHistoryTimeline :history="props.report.history" />
+
     <div v-if="issues.length > 0" class="issues-container">
       <h3>Результаты автоматического контроля:</h3>
       <div v-for="issue in issues" :key="issue.ruleId">

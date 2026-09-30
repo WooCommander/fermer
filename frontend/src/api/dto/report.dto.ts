@@ -1,3 +1,15 @@
+export type ReportHistoryActionDto = 'created' | 'saved' | 'submitted' | 'returned' | 'approved'
+
+export interface ReportHistoryEventDto {
+  id: string
+  action: ReportHistoryActionDto
+  actor: 'farmer' | 'specialist' | 'system'
+  created_at: string
+  from_status?: string
+  to_status: string
+  comment?: string
+}
+
 export interface ReportDto {
   id: string
   farm_id: string
@@ -13,6 +25,7 @@ export interface ReportDto {
   previous_values: Record<string, number | null>
   row_comments: Record<string, string>
   confirmed_warnings: Record<string, boolean>
+  history?: ReportHistoryEventDto[]
   revision_comment?: string
   updated_at: string
   submitted_at?: string
