@@ -383,6 +383,66 @@ function onSubmitCreate(): void {
     </div>
 
     <!-- Диалог подтверждения деактивац�  &.highlight-admin {
+-->
+    <AppConfirmDialog
+      :open="!!userToDelete"
+      title="Удаление учетной записи"
+      :message="`Деактивировать учетную запись ${userToDelete?.name || ''} (${userToDelete?.login || ''})?`"
+      details="Пользователь больше не сможет войти в систему."
+      confirm-text="Да, деактивировать"
+      cancel-text="Отмена"
+      variant="danger"
+      @confirm="confirmDelete"
+      @cancel="userToDelete = null"
+    />
+  </div>
+</template>
+
+<style scoped lang="scss">
+.admin-management-view {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.admin-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 1rem;
+}
+
+.stat-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+
+  .stat-num {
+    font-size: 1.6rem;
+    font-weight: 800;
+    color: #0f172a;
+  }
+
+  .stat-label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #64748b;
+  }
+
+  &.highlight-spec {
+    border-left: 4px solid #3b82f6;
+    .stat-num { color: #2563eb; }
+  }
+
+  &.highlight-farmer {
+    border-left: 4px solid #10b981;
+    .stat-num { color: #059669; }
+  }
+
+  &.highlight-admin {
     border-left: 4px solid #8b5cf6;
     .stat-num { color: #7c3aed; }
   }
@@ -539,23 +599,6 @@ function onSubmitCreate(): void {
   &:hover {
     background: #ffe4e6;
     color: #be123c;
-  }
-}er: none;
-  padding: 0.45rem 0.85rem;
-  border-radius: 8px;
-  font-size: 0.82rem;
-  font-weight: 600;
-  color: #64748b;
-  cursor: pointer;
-  transition: all 0.2s;
-
-  &:hover {
-    color: #0f172a;
-  }
-
-  &.active {
-    background: #f1f5f9;
-    color: #0f172a;
   }
 }
 
