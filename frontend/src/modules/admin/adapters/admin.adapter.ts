@@ -12,5 +12,6 @@ export function toUserAccount(dto: UserDto): UserAccount {
     district: dto.district,
     farmId: dto.farm_id,
     createdAt: dto.created_at,
+    deletedAt: dto.deleted_at ?? null,
   }
 }

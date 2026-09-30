@@ -642,6 +642,10 @@ export const httpClient = {
 
     if (!user) return null
 
+    if (user.deleted_at) {
+      throw new Error('Учетная запись деактивирована администратором и перенесена в архив.')
+    }
+
     let farm: FarmDto | undefined
     if (user.farm_id) {
       const farms = getStoredFarms()
@@ -674,6 +678,7 @@ export const httpClient = {
         contact_person: payload.name,
         activity_type: payload.activity_type || 'crops',
         assigned_forms: payload.assigned_forms || ['1-фермер'],
+        deleted_at: null,
       }
       farms.push(newFarm)
       saveStoredFarms(farms)
@@ -696,6 +701,7 @@ export const httpClient = {
         row_comments: {},
         confirmed_warnings: {},
         updated_at: new Date().toISOString(),
+        deleted_at: null,
       }
       reports.push(newReport)
       saveStoredReports(reports)
@@ -711,6 +717,7 @@ export const httpClient = {
       district: payload.district,
       farm_id: farmId,
       created_at: new Date().toISOString(),
+      deleted_at: null,
     }
 
     users.push(newUser)
@@ -719,8 +726,41 @@ export const httpClient = {
   },
 
   async deleteUser(userId: string): Promise<void> {
-    const users = getStoredUsers().filter((u) => u.id !== userId)
-    saveStoredUsers(users)
+    const users = getStoredUsers()
+    const user = users.find((u) => u.id === userId)
+    if (user) {
+      user.deleted_at = new Date().toISOString()
+      saveStoredUsers(users)
+
+      if (user.farm_id) {
+        const farms = getStoredFarms()
+        const farm = farms.find((f) => f.id === user.farm_id)
+        if (farm) {
+          farm.deleted_at = user.deleted_at
+          saveStoredFarms(farms)
+        }
+      }
+    }
+    return Promise.resolve()
+  },
+
+  async restoreUser(userId: string): Promise<void> {
+    const users = getStoredUsers()
+    const user = users.find((u) => u.id === userId)
+    if (user) {
+      user.deleted_at = null
+      saveStoredUsers(users)
+
+      if (user.farm_id) {
+        const farms = getStoredFarms()
+        const farm = farms.find((f) => f.id === user.farm_id)
+        if (farm) {
+          farm.deleted_at = null
+          saveStoredFarms(farms)
+        }
+      }
+    }
+    return Promise.resolve()
   },
 
   async getFarms(): Promise<FarmDto[]> {

@@ -17,6 +17,7 @@ export interface ReportDto {
   updated_at: string
   submitted_at?: string
   approved_at?: string
+  deleted_at?: string | null
 }
 
 export interface SaveDraftDto {

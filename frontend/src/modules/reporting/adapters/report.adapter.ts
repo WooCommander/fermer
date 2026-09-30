@@ -21,5 +21,6 @@ export function toReportUIModel(dto: ReportDto): ReportUIModel {
     updatedAt: dto.updated_at,
     submittedAt: dto.submitted_at,
     approvedAt: dto.approved_at,
+    deletedAt: dto.deleted_at ?? null,
   }
 }

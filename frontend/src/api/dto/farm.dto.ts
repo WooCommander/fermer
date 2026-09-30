@@ -9,4 +9,5 @@ export interface FarmDto {
   contact_person: string
   activity_type: 'crops' | 'livestock' | 'mixed'
   assigned_forms: string[]
+  deleted_at?: string | null
 }

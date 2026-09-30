@@ -16,6 +16,10 @@ export class AdminService {
   async deleteUser(userId: string): Promise<void> {
     await httpClient.deleteUser(userId)
   }
+
+  async restoreUser(userId: string): Promise<void> {
+    await httpClient.restoreUser(userId)
+  }
 }
 
 export const adminService = new AdminService()

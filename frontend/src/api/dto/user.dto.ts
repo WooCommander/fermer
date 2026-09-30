@@ -8,6 +8,7 @@ export interface UserDto {
   district?: string
   farm_id?: string
   created_at: string
+  deleted_at?: string | null
 }
 
 export interface CreateUserDto {

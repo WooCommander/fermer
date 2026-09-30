@@ -10,6 +10,7 @@ export interface UserAccount {
   district?: string
   farmId?: string
   createdAt: string
+  deletedAt?: string | null
 }
 
 export type ReportStatus =
@@ -37,6 +38,7 @@ export interface FarmProfile {
   contactPerson: string
   activityType: ActivityType
   assignedForms: string[]
+  deletedAt?: string | null
 }
 
 export type ValueType = 'number' | 'integer' | 'text' | 'boolean'
@@ -118,4 +120,5 @@ export interface ReportUIModel {
   updatedAt: string
   submittedAt?: string
   approvedAt?: string
+  deletedAt?: string | null
 }

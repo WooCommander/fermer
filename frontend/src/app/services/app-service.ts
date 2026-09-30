@@ -264,7 +264,21 @@ export class AppService {
     this.adminState.setLoading(true)
     try {
       await adminService.deleteUser(userId)
-      this.adminState.removeUser(userId)
+      this.adminState.markUserDeleted(userId, new Date().toISOString())
+      const farms = await authService.fetchFarms()
+      this.authState.setFarms(farms)
+    } finally {
+      this.adminState.setLoading(false)
+    }
+  }
+
+  async restoreAdminUser(userId: string): Promise<void> {
+    this.adminState.setLoading(true)
+    try {
+      await adminService.restoreUser(userId)
+      this.adminState.markUserDeleted(userId, null)
+      const farms = await authService.fetchFarms()
+      this.authState.setFarms(farms)
     } finally {
       this.adminState.setLoading(false)
     }

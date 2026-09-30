@@ -21,8 +21,17 @@ export const useAdminState = () => ({
   addUser(user: UserAccount) {
     state.users.push(user)
   },
+  markUserDeleted(userId: string, deletedAt: string | null) {
+    const user = state.users.find((u) => u.id === userId)
+    if (user) {
+      user.deletedAt = deletedAt
+    }
+  },
   removeUser(userId: string) {
-    state.users = state.users.filter((u) => u.id !== userId)
+    const user = state.users.find((u) => u.id === userId)
+    if (user) {
+      user.deletedAt = new Date().toISOString()
+    }
   },
   setLoading(loading: boolean) {
     state.isLoading = loading

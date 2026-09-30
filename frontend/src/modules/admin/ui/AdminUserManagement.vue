@@ -17,9 +17,10 @@ const props = withDefaults(defineProps<Props>(), {
 const emit = defineEmits<{
   (e: 'createUser', payload: CreateUserDto): void
   (e: 'deleteUser', userId: string): void
+  (e: 'restoreUser', userId: string): void
 }>()
 
-const activeTab = ref<'all' | UserRole>('all')
+const activeTab = ref<'all' | UserRole | 'deactivated'>('all')
 const showCreateModal = ref(false)
 const modalRole = ref<'specialist' | 'farmer'>('specialist')
 const userToDelete = ref<UserAccount | null>(null)
@@ -33,6 +34,10 @@ function confirmDelete(): void {
     emit('deleteUser', userToDelete.value.id)
     userToDelete.value = null
   }
+}
+
+function onRestoreUser(user: UserAccount): void {
+  emit('restoreUser', user.id)
 }
 
 // Form fields
@@ -59,16 +64,22 @@ const districtsList = [
 ]
 
 const stats = computed(() => {
-  const total = props.users.length
-  const specialists = props.users.filter((u) => u.role === 'specialist').length
-  const farmers = props.users.filter((u) => u.role === 'farmer').length
-  const admins = props.users.filter((u) => u.role === 'admin').length
-  return { total, specialists, farmers, admins }
+  const activeUsers = props.users.filter((u) => !u.deletedAt)
+  const total = activeUsers.length
+  const specialists = activeUsers.filter((u) => u.role === 'specialist').length
+  const farmers = activeUsers.filter((u) => u.role === 'farmer').length
+  const admins = activeUsers.filter((u) => u.role === 'admin').length
+  const deactivated = props.users.filter((u) => !!u.deletedAt).length
+  return { total, specialists, farmers, admins, deactivated }
 })
 
 const filteredUsers = computed(() => {
-  if (activeTab.value === 'all') return props.users
-  return props.users.filter((u) => u.role === activeTab.value)
+  if (activeTab.value === 'deactivated') {
+    return props.users.filter((u) => !!u.deletedAt)
+  }
+  const activeUsers = props.users.filter((u) => !u.deletedAt)
+  if (activeTab.value === 'all') return activeUsers
+  return activeUsers.filter((u) => u.role === activeTab.value)
 })
 
 function openCreateModal(role: 'specialist' | 'farmer'): void {
@@ -129,7 +140,7 @@ function onSubmitCreate(): void {
     <div class="admin-stats-grid">
       <div class="stat-card">
         <span class="stat-num">{{ stats.total }}</span>
-        <span class="stat-label">Всего пользователей</span>
+        <span class="stat-label">Активных пользователей</span>
       </div>
       <div class="stat-card highlight-spec">
         <span class="stat-num">{{ stats.specialists }}</span>
@@ -143,6 +154,10 @@ function onSubmitCreate(): void {
         <span class="stat-num">{{ stats.admins }}</span>
         <span class="stat-label">Администраторов</span>
       </div>
+      <div class="stat-card highlight-archived">
+        <span class="stat-num">{{ stats.deactivated }}</span>
+        <span class="stat-label">В архиве / Деактивировано</span>
+      </div>
     </div>
 
     <!-- Заголовок и кнопки создания -->
@@ -153,7 +168,7 @@ function onSubmitCreate(): void {
           :class="['tab-btn', { active: activeTab === 'all' }]"
           @click="activeTab = 'all'"
         >
-          Все ({{ stats.total }})
+          Все активные ({{ stats.total }})
         </button>
         <button
           type="button"
@@ -175,6 +190,13 @@ function onSubmitCreate(): void {
           @click="activeTab = 'admin'"
         >
           Администраторы ({{ stats.admins }})
+        </button>
+        <button
+          type="button"
+          :class="['tab-btn tab-archived', { active: activeTab === 'deactivated' }]"
+          @click="activeTab = 'deactivated'"
+        >
+          🗄 Архив / Деактивированные ({{ stats.deactivated }})
         </button>
       </div>
 
@@ -198,12 +220,16 @@ function onSubmitCreate(): void {
             <th>Роль</th>
             <th>Район / Отдел</th>
             <th>Контакты</th>
-            <th>Дата регистрации</th>
+            <th>Статус / Регистрация</th>
             <th>Действия</th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="user in filteredUsers" :key="user.id">
+          <tr
+            v-for="user in filteredUsers"
+            :key="user.id"
+            :class="{ 'row-deactivated': !!user.deletedAt }"
+          >
             <td>
               <div class="user-cell">
                 <b>{{ user.name }}</b>
@@ -218,21 +244,44 @@ function onSubmitCreate(): void {
             </td>
             <td>{{ user.district || '—' }}</td>
             <td>{{ user.phone || '—' }}</td>
-            <td>{{ new Date(user.createdAt).toLocaleDateString('ru-RU') }}</td>
             <td>
+              <div class="status-cell">
+                <span v-if="user.deletedAt" class="deactivated-badge">
+                  🗄 Деактивирован {{ new Date(user.deletedAt).toLocaleDateString('ru-RU') }}
+                </span>
+                <span v-else class="active-badge">
+                  Рег: {{ new Date(user.createdAt).toLocaleDateString('ru-RU') }}
+                </span>
+              </div>
+            </td>
+            <td>
+              <!-- Если пользователь деактивирован — кнопка восстановления -->
               <button
-                v-if="user.role !== 'admin'"
+                v-if="user.deletedAt"
+                type="button"
+                class="restore-action-btn"
+                title="Восстановить учетную запись"
+                @click="onRestoreUser(user)"
+              >
+                🔄 Восстановить
+              </button>
+              <!-- Если пользователь активен (и не суперадмин) — кнопка деактивации в архив -->
+              <button
+                v-else-if="user.role !== 'admin'"
                 type="button"
                 class="del-btn"
-                title="Удалить пользователя"
+                title="Деактивировать и перенести в архив"
                 @click="requestDeleteUser(user)"
               >
-                🗑
+                🗄 В архив
               </button>
+              <span v-else class="admin-shield" title="Системная учетная запись">🔒</span>
             </td>
           </tr>
           <tr v-if="filteredUsers.length === 0">
-            <td colspan="7" class="empty-cell">Пользователи не найдены</td>
+            <td colspan="7" class="empty-cell">
+              {{ activeTab === 'deactivated' ? 'В архиве нет деактивированных пользователей' : 'Пользователи не найдены' }}
+            </td>
           </tr>
         </tbody>
       </table>
@@ -333,68 +382,14 @@ function onSubmitCreate(): void {
       </div>
     </div>
 
-    <!-- Диалог подтверждения удаления пользователя -->
-    <AppConfirmDialog
-      :open="!!userToDelete"
-      title="Удаление учетной записи"
-      :message="`Вы действительно хотите удалить учетную запись «${userToDelete?.name || ''}» (${userToDelete?.login || ''})?`"
-      details="Внимание: Доступ пользователя к системе будет прекращен. Это действие необратимо."
-      confirm-text="Да, удалить пользователя"
-      cancel-text="Отмена"
-      variant="danger"
-      @confirm="confirmDelete"
-      @cancel="userToDelete = null"
-    />
-  </div>
-</template>
-
-<style scoped lang="scss">
-.admin-management-view {
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
-}
-
-.admin-stats-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 1rem;
-}
-
-.stat-card {
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-radius: 12px;
-  padding: 1rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-
-  .stat-num {
-    font-size: 1.6rem;
-    font-weight: 800;
-    color: #0f172a;
-  }
-
-  .stat-label {
-    font-size: 0.8rem;
-    font-weight: 600;
-    color: #64748b;
-  }
-
-  &.highlight-spec {
-    border-left: 4px solid #3b82f6;
-    .stat-num { color: #2563eb; }
-  }
-
-  &.highlight-farmer {
-    border-left: 4px solid #10b981;
-    .stat-num { color: #059669; }
-  }
-
-  &.highlight-admin {
+    <!-- Диалог подтверждения деактивац�  &.highlight-admin {
     border-left: 4px solid #8b5cf6;
     .stat-num { color: #7c3aed; }
+  }
+
+  &.highlight-archived {
+    border-left: 4px solid #94a3b8;
+    .stat-num { color: #64748b; }
   }
 }
 
@@ -413,11 +408,139 @@ function onSubmitCreate(): void {
   border-radius: 10px;
   padding: 0.25rem;
   gap: 0.25rem;
+  flex-wrap: wrap;
 }
 
 .tab-btn {
   background: transparent;
   border: none;
+  padding: 0.45rem 0.85rem;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.2s;
+
+  &:hover {
+    color: #0f172a;
+  }
+
+  &.active {
+    background: #f1f5f9;
+    color: #0f172a;
+  }
+
+  &.tab-archived.active {
+    background: #f8fafc;
+    color: #475569;
+    border: 1px solid #cbd5e1;
+  }
+}
+
+.create-buttons {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.table-card {
+  background: #ffffff;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  overflow-x: auto;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.users-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 0.88rem;
+
+  th {
+    background: #f8fafc;
+    padding: 0.75rem 1rem;
+    font-weight: 700;
+    color: #475569;
+    border-bottom: 1px solid #e2e8f0;
+  }
+
+  td {
+    padding: 0.85rem 1rem;
+    border-bottom: 1px solid #f1f5f9;
+    color: #1e293b;
+    vertical-align: middle;
+  }
+
+  tr:hover td {
+    background: #f8fafc;
+  }
+
+  tr.row-deactivated td {
+    background: #fafafa;
+    opacity: 0.85;
+  }
+}
+
+.status-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.deactivated-badge {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #64748b;
+  background: #f1f5f9;
+  padding: 0.2rem 0.5rem;
+  border-radius: 6px;
+  display: inline-block;
+}
+
+.active-badge {
+  font-size: 0.78rem;
+  color: #64748b;
+}
+
+.restore-action-btn {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #1d4ed8;
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 0.35rem 0.65rem;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+
+  &:hover {
+    background: #dbeafe;
+    color: #1e40af;
+  }
+}
+
+.admin-shield {
+  font-size: 1rem;
+  opacity: 0.6;
+}
+
+.del-btn {
+  background: #fff1f2;
+  border: 1px solid #fecdd3;
+  color: #e11d48;
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 0.35rem 0.65rem;
+  border-radius: 6px;
+  transition: all 0.2s;
+
+  &:hover {
+    background: #ffe4e6;
+    color: #be123c;
+  }
+}er: none;
   padding: 0.45rem 0.85rem;
   border-radius: 8px;
   font-size: 0.82rem;

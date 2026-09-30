@@ -13,5 +13,6 @@ export function toFarmProfile(dto: FarmDto): FarmProfile {
     contactPerson: dto.contact_person,
     activityType: dto.activity_type,
     assignedForms: [...dto.assigned_forms],
+    deletedAt: dto.deleted_at ?? null,
   }
 }

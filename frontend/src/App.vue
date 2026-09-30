@@ -107,6 +107,10 @@ function onCreateAdminUser(payload: CreateUserDto): void {
 function onDeleteAdminUser(userId: string): void {
   appService.deleteAdminUser(userId)
 }
+
+function onRestoreAdminUser(userId: string): void {
+  appService.restoreAdminUser(userId)
+}
 </script>
 
 <template>
@@ -199,6 +203,7 @@ function onDeleteAdminUser(userId: string): void {
           :is-loading="adminState.state.value.isLoading"
           @create-user="onCreateAdminUser"
           @delete-user="onDeleteAdminUser"
+          @restore-user="onRestoreAdminUser"
         />
       </template>
     </main>
