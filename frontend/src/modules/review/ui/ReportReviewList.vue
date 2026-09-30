@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import type { ReportUIModel } from '@/shared/types'
 import { AppBadge, AppButton } from '@/shared/ui'
 import { downloadCsv, formatStatusName } from '@/shared/lib'
+import { REVIEW_PAGE_SIZES, useReviewState } from '../state/review.state'
 
 interface Props {
   reports: ReportUIModel[]
@@ -27,28 +28,45 @@ const emit = defineEmits<{
   (e: 'updateSearch', search: string): void
 }>()
 
-const currentYear = new Date().getFullYear()
-const selectedYear = ref(currentYear)
-const expandedFarmIds = ref<string[]>([])
+const SEARCH_DEBOUNCE_MS = 300
 
-const GROUP_STORAGE_KEY = 'agrostat_review_group_by_farm'
-function loadGroupByFarm(): boolean {
-  try {
-    return localStorage.getItem(GROUP_STORAGE_KEY) !== '0'
-  } catch {
-    return true
-  }
-}
-const groupByFarm = ref(loadGroupByFarm())
-watch(groupByFarm, (value) => {
-  try {
-    localStorage.setItem(GROUP_STORAGE_KEY, value ? '1' : '0')
-  } catch {
-    // localStorage недоступен — настройка просто не запомнится
-  }
+const currentYear = new Date().getFullYear()
+const { state: reviewState, updateListView } = useReviewState()
+const listView = computed(() => reviewState.value.listView)
+
+const selectedYear = computed({
+  get: () => listView.value.year,
+  set: (year: number) => updateListView({ year }),
+})
+const selectedForm = computed({
+  get: () => listView.value.formCode,
+  set: (formCode: string) => updateListView({ formCode }),
+})
+const groupByFarm = computed({
+  get: () => listView.value.groupByFarm,
+  set: (groupByFarm: boolean) => updateListView({ groupByFarm }),
+})
+const pageSize = computed({
+  get: () => listView.value.pageSize,
+  set: (size: number) => updateListView({ pageSize: size }),
 })
 
-const selectedForm = ref('all')
+// Поиск: поле обновляется сразу, в общий фильтр значение уходит после паузы в наборе
+const searchInput = ref(props.filterSearch)
+let searchTimer: ReturnType<typeof setTimeout> | undefined
+watch(searchInput, (value) => {
+  clearTimeout(searchTimer)
+  searchTimer = setTimeout(() => emit('updateSearch', value), SEARCH_DEBOUNCE_MS)
+})
+watch(() => props.filterSearch, (value) => {
+  if (value !== searchInput.value) searchInput.value = value
+})
+// Если уходим из списка, не дождавшись паузы, введённый поиск не теряем
+onBeforeUnmount(() => {
+  if (searchTimer === undefined) return
+  clearTimeout(searchTimer)
+  if (searchInput.value !== props.filterSearch) emit('updateSearch', searchInput.value)
+})
 
 const districts = computed(() => Array.from(new Set(props.reports.map((r) => r.district))).sort())
 // Регистратору с одним районом выбирать нечего — фильтр скрываем
@@ -119,9 +137,29 @@ const displayGroups = computed<ReportGroup[]>(() => {
   return Array.from(groups.values(), withStatusCounts)
 })
 
+const pageCount = computed(() => Math.max(1, Math.ceil(displayGroups.value.length / pageSize.value)))
+const currentPage = computed(() => Math.min(listView.value.page, pageCount.value))
+const pagedGroups = computed(() => {
+  const start = (currentPage.value - 1) * pageSize.value
+  return displayGroups.value.slice(start, start + pageSize.value)
+})
+const pageStart = computed(() => displayGroups.value.length ? (currentPage.value - 1) * pageSize.value + 1 : 0)
+const pageEnd = computed(() => Math.min(currentPage.value * pageSize.value, displayGroups.value.length))
+const itemsLabel = computed(() => groupByFarm.value ? 'хозяйств' : 'отчётов')
+
+function goToPage(page: number): void {
+  updateListView({ page: Math.min(Math.max(1, page), pageCount.value) })
+}
+
+// Любое изменение выборки возвращает на первую страницу
+watch(
+  [selectedYear, selectedForm, groupByFarm, pageSize, () => props.filterDistrict, () => props.filterStatus, () => props.filterSearch],
+  () => updateListView({ page: 1 }),
+)
+
 function isFarmExpanded(group: ReportGroup): boolean {
   return group.reports.length === 1
-    || expandedFarmIds.value.includes(group.key)
+    || listView.value.expandedKeys.includes(group.key)
     || group.reports.some((r) => r.id === props.selectedReportId)
 }
 
@@ -133,10 +171,9 @@ function formatReportsCount(count: number): string {
   return `${count} отчётов`
 }
 
-function toggleFarm(farmId: string): void {
-  const index = expandedFarmIds.value.indexOf(farmId)
-  if (index === -1) expandedFarmIds.value.push(farmId)
-  else expandedFarmIds.value.splice(index, 1)
+function toggleFarm(key: string): void {
+  const keys = listView.value.expandedKeys
+  updateListView({ expandedKeys: keys.includes(key) ? keys.filter((item) => item !== key) : [...keys, key] })
 }
 
 const stats = computed(() => {
@@ -197,11 +234,10 @@ function exportFilteredReports(): void {
       <div class="filter-group filter-search">
         <label>Поиск</label>
         <input
-          :value="props.filterSearch"
+          v-model="searchInput"
           type="text"
           placeholder="Хозяйство или фискальный код"
           class="filter-input"
-          @input="emit('updateSearch', ($event.target as HTMLInputElement).value)"
         />
       </div>
 
@@ -282,7 +318,7 @@ function exportFilteredReports(): void {
             <th>Действие</th>
           </tr>
         </thead>
-        <tbody v-for="group in displayGroups" :key="group.key">
+        <tbody v-for="group in pagedGroups" :key="group.key">
           <!-- Шапка хозяйства: только если отчётов несколько -->
           <tr
             v-if="group.reports.length > 1"
@@ -344,6 +380,21 @@ function exportFilteredReports(): void {
           </tr>
         </tbody>
       </table>
+
+      <div v-if="displayGroups.length > 0" class="pagination-bar">
+        <span>Показано {{ pageStart }}–{{ pageEnd }} из {{ displayGroups.length }} {{ itemsLabel }}</span>
+        <div class="pagination-actions">
+          <label class="page-size">
+            На странице
+            <select v-model.number="pageSize" class="filter-select page-size-select">
+              <option v-for="size in REVIEW_PAGE_SIZES" :key="size" :value="size">{{ size }}</option>
+            </select>
+          </label>
+          <AppButton size="sm" variant="secondary" :disabled="currentPage === 1" @click="goToPage(currentPage - 1)">Назад</AppButton>
+          <span>Страница {{ currentPage }} из {{ pageCount }}</span>
+          <AppButton size="sm" variant="secondary" :disabled="currentPage === pageCount" @click="goToPage(currentPage + 1)">Далее</AppButton>
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -516,6 +567,40 @@ function exportFilteredReports(): void {
   background-repeat: no-repeat;
   background-position: right 0.75rem center;
   cursor: pointer;
+}
+
+.pagination-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem 1rem;
+  padding: 0.75rem 1rem;
+  border-top: 1px solid #f1f5f9;
+  color: #64748b;
+  font-size: 0.84rem;
+}
+
+.pagination-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  color: #475569;
+  white-space: nowrap;
+}
+
+.page-size {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-right: 0.5rem;
+}
+
+.page-size-select {
+  width: auto;
+  height: 32px;
+  min-width: 72px;
 }
 
 .table-card {
