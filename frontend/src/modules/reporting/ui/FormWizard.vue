@@ -51,6 +51,17 @@ const hasErrors = computed(() => {
   return props.validationIssues.some((i) => i.severity === 'error')
 })
 
+const errorIssues = computed(() => props.validationIssues.filter((i) => i.severity === 'error'))
+const warningIssues = computed(() => props.validationIssues.filter((i) => i.severity === 'warning'))
+
+const filledRowsCount = computed(() => {
+  return Object.values(props.report.values).filter((v) => v !== null && v !== undefined && !isNaN(v) && v > 0).length
+})
+
+const previousFilledRowsCount = computed(() => {
+  return Object.values(props.report.previousValues).filter((v) => v !== null && v !== undefined && !isNaN(v) && v > 0).length
+})
+
 function prevSection(): void {
   if (props.activeSectionIndex > 0) {
     emit('updateSectionIndex', props.activeSectionIndex - 1)
@@ -89,13 +100,35 @@ function onConfirmSubmit(): void {
           <div class="period-line">Период: <b>{{ props.report.period }}</b></div>
         </div>
 
-        <!-- Прогресс заполнения -->
-        <div class="sidebar-progress-card">
-          <div class="progress-info">
-            <span>Готовность отчета:</span>
-            <b>{{ props.completionPercent }}%</b>
+        <!-- Карточка контроля данных и готовности отчета -->
+        <div class="sidebar-status-card">
+          <div class="status-header">
+            <span class="status-title">Контроль данных:</span>
+            <span v-if="props.report.status === 'approved'" class="status-tag status-approved">Принят</span>
+            <span v-else-if="props.report.status === 'submitted'" class="status-tag status-submitted">Сдан в Госстат</span>
+            <span v-else-if="errorIssues.length > 0" class="status-tag status-error">Ошибки ({{ errorIssues.length }})</span>
+            <span v-else-if="warningIssues.length > 0" class="status-tag status-warning">Предупреждения ({{ warningIssues.length }})</span>
+            <span v-else-if="filledRowsCount > 0" class="status-tag status-ready">Готов к отправке</span>
+            <span v-else class="status-tag status-empty">Не заполнен</span>
           </div>
-          <AppProgressBar :value="props.completionPercent" :show-label="false" />
+
+          <div class="metrics-summary">
+            <div class="metric-line">
+              <span>Заполнено строк:</span>
+              <b>{{ filledRowsCount }}</b>
+            </div>
+            <div v-if="previousFilledRowsCount > 0" class="metric-line sub-line">
+              <span>В прошлом периоде:</span>
+              <span>{{ previousFilledRowsCount }} строк</span>
+            </div>
+          </div>
+
+          <div v-if="errorIssues.length === 0 && filledRowsCount > 0" class="ready-hint-box">
+            <span>✅ Контрольные формулы и балансы соблюдены</span>
+          </div>
+          <div v-else-if="errorIssues.length > 0" class="error-hint-box">
+            <span>❌ Не сходятся контрольные суммы</span>
+          </div>
         </div>
 
         <!-- Меню разделов (Sticky Table of Contents) -->
@@ -294,21 +327,115 @@ function onConfirmSubmit(): void {
   b { color: #1e293b; }
 }
 
-.sidebar-progress-card {
+.sidebar-status-card {
   background: #ffffff;
   border: 1px solid #e2e8f0;
   border-radius: 12px;
   padding: 1rem;
   display: flex;
   flex-direction: column;
+  gap: 0.65rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+}
+
+.status-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: 0.5rem;
 }
 
-.progress-info {
+.status-title {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.status-tag {
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 0.15rem 0.55rem;
+  border-radius: 9999px;
+
+  &.status-ready {
+    background: #f0fdf4;
+    color: #15803d;
+    border: 1px solid #bbf7d0;
+  }
+  &.status-submitted {
+    background: #eff6ff;
+    color: #1d4ed8;
+    border: 1px solid #bfdbfe;
+  }
+  &.status-approved {
+    background: #f0fdf4;
+    color: #047857;
+    border: 1px solid #a7f3d0;
+  }
+  &.status-error {
+    background: #fef2f2;
+    color: #b91c1c;
+    border: 1px solid #fecaca;
+  }
+  &.status-warning {
+    background: #fffbeb;
+    color: #b45309;
+    border: 1px solid #fde68a;
+  }
+  &.status-empty {
+    background: #f1f5f9;
+    color: #64748b;
+    border: 1px solid #e2e8f0;
+  }
+}
+
+.metrics-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.5rem 0.65rem;
+  background: #f8fafc;
+  border-radius: 8px;
+  border: 1px solid #f1f5f9;
+}
+
+.metric-line {
   display: flex;
   justify-content: space-between;
-  font-size: 0.85rem;
-  color: #475569;
+  font-size: 0.82rem;
+  color: #334155;
+
+  b {
+    color: #0f172a;
+    font-weight: 700;
+  }
+
+  &.sub-line {
+    font-size: 0.75rem;
+    color: #64748b;
+  }
+}
+
+.ready-hint-box {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #15803d;
+  background: #f0fdf4;
+  padding: 0.4rem 0.6rem;
+  border-radius: 6px;
+  line-height: 1.3;
+}
+
+.error-hint-box {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #b91c1c;
+  background: #fef2f2;
+  padding: 0.4rem 0.6rem;
+  border-radius: 6px;
+  line-height: 1.3;
 }
 
 .sections-nav {

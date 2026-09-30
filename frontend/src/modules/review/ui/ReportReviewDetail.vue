@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import type { ReportUIModel, FormSchema } from '@/shared/types'
-import { AppButton, AppBadge, AppAlert } from '@/shared/ui'
+import { AppButton, AppBadge, AppAlert, AppConfirmDialog } from '@/shared/ui'
 import { getFormSchemaByCode } from '@/modules/reporting/schemas'
 import { validateFormValues } from '@/shared/lib'
 
@@ -26,13 +26,17 @@ const issues = computed(() => {
 })
 
 const showRevisionBox = ref(false)
+const showApproveConfirm = ref(false)
+const showRevisionConfirm = ref(false)
 const revisionComment = ref(props.report.revisionComment || '')
 
-function onApprove(): void {
+function onApproveConfirm(): void {
+  showApproveConfirm.value = false
   emit('approve', props.report.id)
 }
 
-function onSendRevision(): void {
+function onSendRevisionConfirm(): void {
+  showRevisionConfirm.value = false
   if (revisionComment.value.trim()) {
     emit('returnRevision', props.report.id, revisionComment.value)
     showRevisionBox.value = false
@@ -129,7 +133,7 @@ function onSendRevision(): void {
         <AppButton
           v-if="props.report.status !== 'approved'"
           variant="success"
-          @click="onApprove"
+          @click="showApproveConfirm = true"
         >
           ✅ Принять отчет
         </AppButton>
@@ -153,13 +157,36 @@ function onSendRevision(): void {
           <AppButton
             variant="danger"
             :disabled="!revisionComment.trim()"
-            @click="onSendRevision"
+            @click="showRevisionConfirm = true"
           >
             Отправить замечание фермеру
           </AppButton>
         </div>
       </div>
     </div>
+
+    <!-- Диалоги подтверждения для инспектора -->
+    <AppConfirmDialog
+      :open="showApproveConfirm"
+      title="Утвердить статистический отчет?"
+      :message="`Вы подтверждаете прием отчета «${props.report.formCode}» от хозяйства ${props.report.farmName} за период ${props.report.period}. Отчет будет официально зафиксирован в Государственной службе статистики и станет доступен респонденту в архиве.`"
+      confirm-text="Да, утвердить отчет"
+      cancel-text="Отмена"
+      variant="success"
+      @confirm="onApproveConfirm"
+      @cancel="showApproveConfirm = false"
+    />
+
+    <AppConfirmDialog
+      :open="showRevisionConfirm"
+      title="Вернуть отчет на доработку?"
+      :message="`Отчет «${props.report.formCode}» будет возвращен респонденту (${props.report.farmName}) со статусом «Требует исправления». Фермер получит указанное вами замечание и сможет внести правки.`"
+      confirm-text="Да, вернуть респонденту"
+      cancel-text="Отмена"
+      variant="warning"
+      @confirm="onSendRevisionConfirm"
+      @cancel="showRevisionConfirm = false"
+    />
   </div>
 </template>
 

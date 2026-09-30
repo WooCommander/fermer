@@ -1,6 +1,7 @@
 <script setup lang="ts">
+import { ref } from 'vue'
 import type { UserAccount, FarmProfile } from '@/shared/types'
-import { AppButton } from '@/shared/ui'
+import { AppButton, AppConfirmDialog } from '@/shared/ui'
 
 interface Props {
   currentUser: UserAccount | null
@@ -18,6 +19,13 @@ const emit = defineEmits<{
   (e: 'goToDashboard'): void
   (e: 'logout'): void
 }>()
+
+const showLogoutConfirm = ref(false)
+
+function onLogoutConfirm(): void {
+  showLogoutConfirm.value = false
+  emit('logout')
+}
 </script>
 
 <template>
@@ -61,12 +69,24 @@ const emit = defineEmits<{
         <AppButton
           size="sm"
           variant="ghost"
-          @click="emit('logout')"
+          @click="showLogoutConfirm = true"
         >
           Выйти ✕
         </AppButton>
       </div>
     </div>
+
+    <!-- Диалог подтверждения выхода -->
+    <AppConfirmDialog
+      :open="showLogoutConfirm"
+      title="Завершить сеанс работы?"
+      message="Вы уверены, что хотите выйти из учетной записи? Убедитесь, что все несохраненные данные отчетов были сохранены в черновик."
+      confirm-text="Да, выйти"
+      cancel-text="Остаться"
+      variant="warning"
+      @confirm="onLogoutConfirm"
+      @cancel="showLogoutConfirm = false"
+    />
   </header>
 </template>
 

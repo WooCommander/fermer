@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import type { UserAccount, UserRole, ActivityType } from '@/shared/types'
-import { AppButton, AppInput, AppAlert } from '@/shared/ui'
+import { AppButton, AppInput, AppAlert, AppConfirmDialog } from '@/shared/ui'
 import type { CreateUserDto } from '@/api'
 
 interface Props {
@@ -22,6 +22,18 @@ const emit = defineEmits<{
 const activeTab = ref<'all' | UserRole>('all')
 const showCreateModal = ref(false)
 const modalRole = ref<'specialist' | 'farmer'>('specialist')
+const userToDelete = ref<UserAccount | null>(null)
+
+function requestDeleteUser(user: UserAccount): void {
+  userToDelete.value = user
+}
+
+function confirmDelete(): void {
+  if (userToDelete.value) {
+    emit('deleteUser', userToDelete.value.id)
+    userToDelete.value = null
+  }
+}
 
 // Form fields
 const formName = ref('')
@@ -213,7 +225,7 @@ function onSubmitCreate(): void {
                 type="button"
                 class="del-btn"
                 title="Удалить пользователя"
-                @click="emit('deleteUser', user.id)"
+                @click="requestDeleteUser(user)"
               >
                 🗑
               </button>
@@ -320,6 +332,19 @@ function onSubmitCreate(): void {
         </div>
       </div>
     </div>
+
+    <!-- Диалог подтверждения удаления пользователя -->
+    <AppConfirmDialog
+      :open="!!userToDelete"
+      title="Удаление учетной записи"
+      :message="`Вы действительно хотите удалить учетную запись «${userToDelete?.name || ''}» (${userToDelete?.login || ''})?`"
+      details="Внимание: Доступ пользователя к системе будет прекращен. Это действие необратимо."
+      confirm-text="Да, удалить пользователя"
+      cancel-text="Отмена"
+      variant="danger"
+      @confirm="confirmDelete"
+      @cancel="userToDelete = null"
+    />
   </div>
 </template>
 

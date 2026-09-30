@@ -1,5 +1,7 @@
 <script setup lang="ts">
+import { ref } from 'vue'
 import type { FormSectionSchema, ValidationIssue } from '@/shared/types'
+import { AppConfirmDialog } from '@/shared/ui'
 import FormRowItem from './FormRowItem.vue'
 
 interface Props {
@@ -26,6 +28,19 @@ const emit = defineEmits<{
   (e: 'copyAllPrevious'): void
 }>()
 
+const showZerosConfirm = ref(false)
+const showCopyConfirm = ref(false)
+
+function onConfirmZeros(): void {
+  showZerosConfirm.value = false
+  emit('fillZeros')
+}
+
+function onConfirmCopy(): void {
+  showCopyConfirm.value = false
+  emit('copyAllPrevious')
+}
+
 function hasRowError(rowCode: string): boolean {
   return props.issues.some((i) => i.rowCode === rowCode && i.severity === 'error')
 }
@@ -45,10 +60,20 @@ function hasRowWarning(rowCode: string): boolean {
       </div>
 
       <div v-if="!props.readonly" class="section-quick-actions">
-        <button type="button" class="quick-btn" title="Подставить значения прошлого года для всех строк раздела" @click="emit('copyAllPrevious')">
+        <button
+          type="button"
+          class="quick-btn"
+          title="Подставить значения прошлого года для всех строк раздела"
+          @click="showCopyConfirm = true"
+        >
           📋 Копировать прошлый год
         </button>
-        <button type="button" class="quick-btn" title="Заполнить пустые поля раздела нулями" @click="emit('fillZeros')">
+        <button
+          type="button"
+          class="quick-btn"
+          title="Заполнить пустые поля раздела нулями"
+          @click="showZerosConfirm = true"
+        >
           0️⃣ Заполнить нулями
         </button>
       </div>
@@ -83,6 +108,29 @@ function hasRowWarning(rowCode: string): boolean {
         </tbody>
       </table>
     </div>
+
+    <!-- Модальные окна подтверждения необратимых действий -->
+    <AppConfirmDialog
+      :open="showZerosConfirm"
+      title="Заполнить пустые поля нулями?"
+      message="Все незаполненные поля ввода в текущем разделе будут установлены в значение 0. Ранее введённые данные не будут стёрты."
+      confirm-text="Да, заполнить нулями"
+      cancel-text="Отмена"
+      variant="primary"
+      @confirm="onConfirmZeros"
+      @cancel="showZerosConfirm = false"
+    />
+
+    <AppConfirmDialog
+      :open="showCopyConfirm"
+      title="Скопировать данные за прошлый год?"
+      message="Значения всех строк текущего раздела будут заменены на соответствующие показатели прошлого отчётного периода (2025 г.). Текущие введённые значения раздела будут перезаписаны."
+      confirm-text="Да, скопировать"
+      cancel-text="Отмена"
+      variant="warning"
+      @confirm="onConfirmCopy"
+      @cancel="showCopyConfirm = false"
+    />
   </div>
 </template>
 

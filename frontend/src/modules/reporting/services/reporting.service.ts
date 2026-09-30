@@ -55,20 +55,64 @@ export class ReportingService {
     return validateFormValues(schema.validationRules, report.values, report.previousValues)
   }
 
-  calculateCompletionPercent(report: ReportUIModel): number {
+  getReportStats(report: ReportUIModel) {
     const schema = getFormSchemaByCode(report.formCode)
     const allInputRows = schema.sections
       .flatMap((s) => s.rows)
       .filter((r) => !r.isCalculated)
-
-    if (allInputRows.length === 0) return 100
 
     const filledCount = allInputRows.filter((r) => {
       const val = report.values[r.code]
       return val !== null && val !== undefined && !isNaN(val)
     }).length
 
-    return Math.round((filledCount / allInputRows.length) * 100)
+    const previousFilledCount = allInputRows.filter((r) => {
+      const prev = report.previousValues[r.code]
+      return prev !== null && prev !== undefined && !isNaN(prev) && prev > 0
+    }).length
+
+    const issues = this.validateReport(report)
+    const errorCount = issues.filter((i) => i.severity === 'error').length
+    const warningCount = issues.filter((i) => i.severity === 'warning').length
+
+    let statusType: 'ready' | 'has_errors' | 'has_warnings' | 'empty' | 'submitted' | 'approved' = 'ready'
+    let statusLabel = 'Готов к отправке'
+
+    if (report.status === 'approved') {
+      statusType = 'approved'
+      statusLabel = 'Принят статистикой'
+    } else if (report.status === 'submitted') {
+      statusType = 'submitted'
+      statusLabel = 'Сдан на проверку'
+    } else if (errorCount > 0) {
+      statusType = 'has_errors'
+      statusLabel = `Ошибки в контроле (${errorCount})`
+    } else if (warningCount > 0) {
+      statusType = 'has_warnings'
+      statusLabel = `Предупреждений: ${warningCount}`
+    } else if (filledCount === 0) {
+      statusType = 'empty'
+      statusLabel = 'Не заполнен'
+    }
+
+    return {
+      filledCount,
+      totalInputs: allInputRows.length,
+      previousFilledCount,
+      errorCount,
+      warningCount,
+      statusType,
+      statusLabel,
+    }
+  }
+
+  calculateCompletionPercent(report: ReportUIModel): number {
+    const stats = this.getReportStats(report)
+    if (stats.errorCount > 0) return 30
+    if (stats.filledCount === 0) return 0
+    if (stats.statusType === 'submitted' || stats.statusType === 'approved') return 100
+    if (stats.warningCount > 0) return 85
+    return 100
   }
 }
 
