@@ -1,14 +1,16 @@
 import { reactive, computed } from 'vue'
-import type { UserAccount } from '@/shared/types'
+import type { AuditEntry, UserAccount } from '@/shared/types'
 
 interface AdminState {
   users: UserAccount[]
+  auditEntries: AuditEntry[]
   isLoading: boolean
   error: string | null
 }
 
 const state = reactive<AdminState>({
   users: [],
+  auditEntries: [],
   isLoading: false,
   error: null,
 })
@@ -17,6 +19,9 @@ export const useAdminState = () => ({
   state: computed(() => state),
   setUsers(users: UserAccount[]) {
     state.users = users
+  },
+  setAuditEntries(entries: AuditEntry[]) {
+    state.auditEntries = entries
   },
   addUser(user: UserAccount) {
     state.users.push(user)

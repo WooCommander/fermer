@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import type { UserAccount, UserRole, ActivityType, FarmProfile } from '@/shared/types'
-import { AppButton, AppInput, AppAlert, AppConfirmDialog } from '@/shared/ui'
+import { AppButton, AppInput, AppAlert, AppConfirmDialog, AppSpinner } from '@/shared/ui'
 import type { CreateUserDto, UpdateUserDto } from '@/api'
 
 interface Props {
@@ -32,7 +32,8 @@ const isEditing = computed(() => editingUser.value !== null)
 const searchQuery = ref('')
 const filterDistrict = ref('all')
 const currentPage = ref(1)
-const pageSize = 25
+const PAGE_SIZES = [25, 50, 100]
+const pageSize = ref(PAGE_SIZES[0])
 
 function requestDeleteUser(user: UserAccount): void {
   userToDelete.value = user
@@ -121,13 +122,13 @@ const filteredUsers = computed(() => {
   })
 })
 
-const pageCount = computed(() => Math.max(1, Math.ceil(filteredUsers.value.length / pageSize)))
+const pageCount = computed(() => Math.max(1, Math.ceil(filteredUsers.value.length / pageSize.value)))
 const paginatedUsers = computed(() => {
-  const start = (currentPage.value - 1) * pageSize
-  return filteredUsers.value.slice(start, start + pageSize)
+  const start = (currentPage.value - 1) * pageSize.value
+  return filteredUsers.value.slice(start, start + pageSize.value)
 })
-const pageStart = computed(() => filteredUsers.value.length ? (currentPage.value - 1) * pageSize + 1 : 0)
-const pageEnd = computed(() => Math.min(currentPage.value * pageSize, filteredUsers.value.length))
+const pageStart = computed(() => filteredUsers.value.length ? (currentPage.value - 1) * pageSize.value + 1 : 0)
+const pageEnd = computed(() => Math.min(currentPage.value * pageSize.value, filteredUsers.value.length))
 
 watch([activeTab, searchQuery, filterDistrict], () => {
   currentPage.value = 1
@@ -359,7 +360,8 @@ function onSubmitUser(): void {
       </select>
     </div>
 
-    <div class="table-card">
+    <div class="table-card loader-host">
+      <AppSpinner v-if="props.isLoading" overlay label="Загрузка…" />
       <table class="users-table">
         <thead>
           <tr>
@@ -445,6 +447,12 @@ function onSubmitUser(): void {
       <div v-if="filteredUsers.length > 0" class="pagination-bar">
         <span>Показано {{ pageStart }}–{{ pageEnd }} из {{ filteredUsers.length }}</span>
         <div class="pagination-actions">
+          <label class="page-size">
+            На странице
+            <select v-model.number="pageSize" class="page-size-select">
+              <option v-for="size in PAGE_SIZES" :key="size" :value="size">{{ size }}</option>
+            </select>
+          </label>
           <AppButton size="sm" variant="secondary" :disabled="currentPage === 1" @click="currentPage -= 1">Назад</AppButton>
           <span>Страница {{ currentPage }} из {{ pageCount }}</span>
           <AppButton size="sm" variant="secondary" :disabled="currentPage === pageCount" @click="currentPage += 1">Далее</AppButton>
@@ -1062,6 +1070,29 @@ code {
   padding: 0.75rem 1rem;
   color: #64748b;
   font-size: 0.84rem;
+}
+
+.loader-host {
+  position: relative;
+  min-height: 120px;
+}
+
+.page-size {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-right: 0.5rem;
+}
+
+.page-size-select {
+  height: 32px;
+  padding: 0 0.5rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #1e293b;
+  font: inherit;
+  cursor: pointer;
 }
 
 .pagination-actions {

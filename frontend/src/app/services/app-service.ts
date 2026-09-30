@@ -72,6 +72,7 @@ export class AppService {
   private async applyUserSession(user: import('@/shared/types').UserAccount): Promise<void> {
     this.authState.setCurrentUser(user)
     this.notificationState.loadRead(user.id)
+    httpClient.setAuditActor({ id: user.id, name: user.name, role: user.role })
 
     if (user.role === 'farmer' && user.farmId) {
       const farmDto = await httpClient.getFarmById(user.farmId)
@@ -100,6 +101,8 @@ export class AppService {
 
   async logout(): Promise<void> {
     await this.flushAutosave()
+    httpClient.recordLogout()
+    httpClient.setAuditActor(null)
     localStorage.removeItem(SESSION_STORAGE_KEY)
     this.authState.setCurrentUser(null)
     this.authState.setCurrentFarm(null)
@@ -348,6 +351,15 @@ export class AppService {
   }
 
   // --- admin methods (для администратора) ---
+  async loadAuditLog(): Promise<void> {
+    this.adminState.setLoading(true)
+    try {
+      this.adminState.setAuditEntries(await adminService.fetchAuditLog())
+    } finally {
+      this.adminState.setLoading(false)
+    }
+  }
+
   async loadAdminUsers(): Promise<void> {
     this.adminState.setLoading(true)
     try {

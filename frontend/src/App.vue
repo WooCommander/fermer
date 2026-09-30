@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { onMounted, computed, ref } from 'vue'
+import { onMounted, computed, ref, watch } from 'vue'
+import { AppSpinner } from '@/shared/ui'
 import { appService, AppHeader } from '@/app'
 import { useAuthState, AuthLoginForm } from '@/modules/auth'
 import { useReportingState, getFormSchemaByCode, FormWizard, FarmerDashboard, reportingService } from '@/modules/reporting'
 import { useReviewState, ReportReviewList, ReportReviewDetail } from '@/modules/review'
-import { useAdminState, AdminUserManagement, AdminReportSettings, AdminHelpSettings } from '@/modules/admin'
+import { useAdminState, AdminUserManagement, AdminReportSettings, AdminHelpSettings, AdminAuditLog } from '@/modules/admin'
 import { useNotificationState, buildNotifications, NotificationBell, AdminNotificationSettings } from '@/modules/notifications'
 import type { AppNotification, HelpSettings, NotificationSettings, ReportFormSettings, ReportUIModel, RevisionRow } from '@/shared/types'
 import type { CreateUserDto, UpdateUserDto } from '@/api'
@@ -14,10 +15,21 @@ const reportingState = useReportingState()
 const reviewState = useReviewState()
 const adminState = useAdminState()
 const notificationState = useNotificationState()
-const adminSection = ref<'users' | 'reporting' | 'help' | 'notifications'>('users')
+const adminSection = ref<'users' | 'reporting' | 'help' | 'notifications' | 'audit'>('users')
+
+watch(adminSection, (section) => {
+  if (section === 'audit') appService.loadAuditLog()
+})
+
+// Пока поднимается сессия и грузятся данные, показываем крутилку, а не пустой экран или форму входа
+const isBooting = ref(true)
 
 onMounted(async () => {
-  await appService.initializeApp()
+  try {
+    await appService.initializeApp()
+  } finally {
+    isBooting.value = false
+  }
   if (window.Telegram?.WebApp) {
     window.Telegram.WebApp.ready()
     window.Telegram.WebApp.expand?.()
@@ -187,9 +199,14 @@ function onUpdateReportFormSettings(settings: ReportFormSettings): void {
     </AppHeader>
 
     <main class="app-main">
+      <div v-if="isBooting" class="boot-screen">
+        <AppSpinner size="lg" label="Загрузка…" />
+      </div>
+
       <!-- 0. Экран аутентификации (если пользователь не вошел) -->
       <AuthLoginForm
         v-if="!currentUser"
+        v-show="!isBooting"
         :is-loading="authState.state.value.isLoading"
         :error="authState.state.value.error"
         @login="onLogin"
@@ -258,6 +275,7 @@ function onUpdateReportFormSettings(settings: ReportFormSettings): void {
             :filter-district="reviewState.state.value.filterDistrict"
             :filter-status="reviewState.state.value.filterStatus"
             :filter-search="reviewState.state.value.filterSearch"
+            :is-loading="reviewState.state.value.isLoading"
             @select-report="onSelectReviewReport"
             @update-district="reviewState.setFilterDistrict"
             @update-status="reviewState.setFilterStatus"
@@ -273,6 +291,7 @@ function onUpdateReportFormSettings(settings: ReportFormSettings): void {
           <button type="button" :class="{ active: adminSection === 'reporting' }" @click="adminSection = 'reporting'">Настройки отчётности</button>
           <button type="button" :class="{ active: adminSection === 'help' }" @click="adminSection = 'help'">Справочная служба</button>
           <button type="button" :class="{ active: adminSection === 'notifications' }" @click="adminSection = 'notifications'">Уведомления</button>
+          <button type="button" :class="{ active: adminSection === 'audit' }" @click="adminSection = 'audit'">Журнал действий</button>
         </div>
         <AdminUserManagement
           v-if="adminSection === 'users'"
@@ -293,6 +312,12 @@ function onUpdateReportFormSettings(settings: ReportFormSettings): void {
           v-else-if="adminSection === 'help'"
           :settings="reportingState.state.value.helpSettings"
           @update="onUpdateHelpSettings"
+        />
+        <AdminAuditLog
+          v-else-if="adminSection === 'audit'"
+          :entries="adminState.state.value.auditEntries"
+          :is-loading="adminState.state.value.isLoading"
+          @refresh="appService.loadAuditLog()"
         />
         <AdminNotificationSettings
           v-else-if="notificationState.state.value.settings && notificationState.state.value.defaults"
@@ -325,6 +350,13 @@ function onUpdateReportFormSettings(settings: ReportFormSettings): void {
   @media (max-width: 768px) {
     padding: 1rem 0.75rem;
   }
+}
+
+.boot-screen {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 50vh;
 }
 
 .back-bar {

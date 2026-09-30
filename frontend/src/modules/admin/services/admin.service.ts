@@ -1,6 +1,6 @@
 import { httpClient, type CreateUserDto, type UpdateUserDto } from '@/api'
-import type { UserAccount } from '@/shared/types'
-import { toUserAccount } from '../adapters/admin.adapter'
+import type { AuditEntry, UserAccount } from '@/shared/types'
+import { toAuditEntry, toUserAccount } from '../adapters/admin.adapter'
 
 export class AdminService {
   async fetchUsers(): Promise<UserAccount[]> {
@@ -20,6 +20,11 @@ export class AdminService {
 
   async deleteUser(userId: string): Promise<void> {
     await httpClient.deleteUser(userId)
+  }
+
+  async fetchAuditLog(): Promise<AuditEntry[]> {
+    const dtos = await httpClient.getAuditLog()
+    return dtos.map(toAuditEntry)
   }
 
   async restoreUser(userId: string): Promise<void> {

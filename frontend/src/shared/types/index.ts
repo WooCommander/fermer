@@ -101,6 +101,40 @@ export interface FormSchema {
   validationRules: ValidationRule[]
 }
 
+export type AuditAction =
+  | 'login'
+  | 'login_failed'
+  | 'logout'
+  | 'user_created'
+  | 'user_updated'
+  | 'user_deleted'
+  | 'user_restored'
+  | 'report_created'
+  | 'report_submitted'
+  | 'report_returned'
+  | 'report_approved'
+  | 'form_settings_updated'
+  | 'help_settings_updated'
+  | 'notification_settings_updated'
+  | 'farm_contacts_updated'
+
+export type AuditObjectType = 'session' | 'user' | 'farm' | 'report' | 'settings'
+
+export interface AuditEntry {
+  id: string
+  createdAt: string
+  actorId: string
+  actorName: string
+  actorRole: UserRole | 'system'
+  action: AuditAction
+  objectType: AuditObjectType
+  objectId?: string
+  objectLabel: string
+  before?: string
+  after?: string
+  details?: string
+}
+
 export type NotificationKind =
   | 'period_open'
   | 'deadline_soon'

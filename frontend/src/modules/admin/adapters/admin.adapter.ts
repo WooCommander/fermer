@@ -1,5 +1,5 @@
-import type { UserDto } from '@/api'
-import type { UserAccount } from '@/shared/types'
+import type { AuditEntryDto, UserDto } from '@/api'
+import type { AuditEntry, UserAccount } from '@/shared/types'
 
 export function toUserAccount(dto: UserDto): UserAccount {
   return {
@@ -14,5 +14,22 @@ export function toUserAccount(dto: UserDto): UserAccount {
     farmId: dto.farm_id,
     createdAt: dto.created_at,
     deletedAt: dto.deleted_at ?? null,
+  }
+}
+
+export function toAuditEntry(dto: AuditEntryDto): AuditEntry {
+  return {
+    id: dto.id,
+    createdAt: dto.created_at,
+    actorId: dto.actor_id,
+    actorName: dto.actor_name,
+    actorRole: dto.actor_role,
+    action: dto.action,
+    objectType: dto.object_type,
+    objectId: dto.object_id,
+    objectLabel: dto.object_label,
+    before: dto.before,
+    after: dto.after,
+    details: dto.details,
   }
 }

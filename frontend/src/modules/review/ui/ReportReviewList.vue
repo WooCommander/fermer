@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import type { ReportUIModel } from '@/shared/types'
-import { AppBadge, AppButton } from '@/shared/ui'
+import { AppBadge, AppButton, AppSpinner } from '@/shared/ui'
 import { downloadCsv, formatStatusName } from '@/shared/lib'
 import { REVIEW_PAGE_SIZES, useReviewState } from '../state/review.state'
 
@@ -11,6 +11,7 @@ interface Props {
   filterDistrict: string
   filterStatus: string
   filterSearch: string
+  isLoading?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -19,6 +20,7 @@ const props = withDefaults(defineProps<Props>(), {
   filterDistrict: 'all',
   filterStatus: 'all',
   filterSearch: '',
+  isLoading: false,
 })
 
 const emit = defineEmits<{
@@ -300,7 +302,8 @@ function exportFilteredReports(): void {
     </div>
 
     <!-- Список отчетов -->
-    <div class="table-card">
+    <div class="table-card loader-host">
+      <AppSpinner v-if="props.isLoading" overlay label="Загрузка отчётов…" />
       <table class="reports-table">
         <colgroup>
           <col style="width: 28%" />
@@ -603,6 +606,11 @@ function exportFilteredReports(): void {
   width: auto;
   height: 32px;
   min-width: 72px;
+}
+
+.loader-host {
+  position: relative;
+  min-height: 120px;
 }
 
 .table-card {

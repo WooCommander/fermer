@@ -1,4 +1,4 @@
-import type { NotificationSettingsDto, UpdateNotificationSettingsDto, HelpSettingsDto, HelpContactDto, UpdateHelpSettingsDto, FarmDto, ReportDto, ReportHistoryEventDto, CreateReportDto, SaveDraftDto, SubmitReportDto, ReviewReportDto, UserDto, CreateUserDto, UpdateUserDto, ReportFormSettingsDto, UpdateReportFormSettingsDto } from './dto'
+import type { AuditEntryDto, AuditActorDto, NotificationSettingsDto, UpdateNotificationSettingsDto, HelpSettingsDto, HelpContactDto, UpdateHelpSettingsDto, FarmDto, ReportDto, ReportHistoryEventDto, CreateReportDto, SaveDraftDto, SubmitReportDto, ReviewReportDto, UserDto, CreateUserDto, UpdateUserDto, ReportFormSettingsDto, UpdateReportFormSettingsDto } from './dto'
 
 const STORAGE_KEY_REPORTS = 'agrostat_reports_v7'
 const STORAGE_KEY_FARMS = 'agrostat_farms_v7'
@@ -6,8 +6,71 @@ const STORAGE_KEY_USERS = 'agrostat_users_v7'
 const STORAGE_KEY_REPORT_FORM_SETTINGS = 'agrostat_report_form_settings_v1'
 const STORAGE_KEY_HELP_SETTINGS = 'agrostat_help_settings_v1'
 const STORAGE_KEY_NOTIFICATION_SETTINGS = 'agrostat_notification_settings_v1'
+const STORAGE_KEY_AUDIT_LOG = 'agrostat_audit_log_v1'
+const AUDIT_LOG_LIMIT = 5000
 const STORAGE_KEY_REGISTRATION_COUNTER = 'agrostat_registration_counter_v1'
 const CENTRAL_OFFICE_LABEL = 'Центральный аппарат'
+
+// --- Журнал действий. В заглушке его пишет «сервер» (этот файл) от имени текущего пользователя;
+// настоящий сервер будет делать то же самое из контекста авторизации, а не по данным клиента.
+let auditActor: AuditActorDto | null = null
+
+type AuditDraft = Omit<AuditEntryDto, 'id' | 'created_at' | 'actor_id' | 'actor_name' | 'actor_role'>
+
+function writeAudit(entry: AuditDraft, actor: AuditActorDto | null = auditActor): void {
+  try {
+    const log = JSON.parse(localStorage.getItem(STORAGE_KEY_AUDIT_LOG) ?? '[]') as AuditEntryDto[]
+    log.unshift({
+      id: `audit-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      created_at: new Date().toISOString(),
+      actor_id: actor?.id ?? 'system',
+      actor_name: actor?.name ?? 'Система',
+      actor_role: actor?.role ?? 'system',
+      ...entry,
+    })
+    localStorage.setItem(STORAGE_KEY_AUDIT_LOG, JSON.stringify(log.slice(0, AUDIT_LOG_LIMIT)))
+  } catch {
+    // журнал недоступен — основное действие от этого не должно ломаться
+  }
+}
+
+function formatAuditValue(value: unknown): string {
+  if (value === undefined || value === null || value === '') return '—'
+  if (typeof value === 'boolean') return value ? 'да' : 'нет'
+  if (Array.isArray(value)) return value.length ? value.join(', ') : '—'
+  return String(value)
+}
+
+// Сравнивает два объекта и возвращает только изменившиеся поля в виде «Поле: значение» построчно
+function describeChanges(before: object, after: object, labels: Record<string, string>): { before?: string; after?: string } {
+  const b = before as Record<string, unknown>
+  const a = after as Record<string, unknown>
+  const keys = Object.keys(labels).filter((key) => JSON.stringify(b[key]) !== JSON.stringify(a[key]))
+  if (keys.length === 0) return {}
+  return {
+    before: keys.map((key) => `${labels[key]}: ${formatAuditValue(b[key])}`).join('\n'),
+    after: keys.map((key) => `${labels[key]}: ${formatAuditValue(a[key])}`).join('\n'),
+  }
+}
+
+const USER_AUDIT_LABELS: Record<string, string> = {
+  name: 'Имя', login: 'Логин', phone: 'Телефон', email: 'Email', districts: 'Районы',
+}
+const FARM_AUDIT_LABELS: Record<string, string> = {
+  name: 'Хозяйство', fiscal_code: 'Фискальный код', district: 'Район', activity_type: 'Вид деятельности', assigned_forms: 'Формы',
+}
+const FORM_SETTINGS_AUDIT_LABELS: Record<string, string> = {
+  is_active: 'Форма активна',
+  submission_start_month: 'Месяц открытия',
+  submission_start_day: 'День открытия',
+  submission_deadline_month: 'Месяц срока',
+  submission_deadline_day: 'День срока',
+  deadline_year_offset: 'Сдвиг года срока',
+}
+
+function reportAuditLabel(report: ReportDto): string {
+  return `${report.form_code} · ${report.farm_name} · ${report.period}`
+}
 
 function createDefaultNotificationSettings(): NotificationSettingsDto {
   return {
@@ -740,6 +803,22 @@ function saveStoredUsers(users: UserDto[]): void {
 }
 
 export const httpClient = {
+  setAuditActor(actor: AuditActorDto | null): void {
+    auditActor = actor
+  },
+
+  recordLogout(): void {
+    if (auditActor) writeAudit({ action: 'logout', object_type: 'session', object_id: auditActor.id, object_label: auditActor.name })
+  },
+
+  async getAuditLog(): Promise<AuditEntryDto[]> {
+    try {
+      return JSON.parse(localStorage.getItem(STORAGE_KEY_AUDIT_LOG) ?? '[]') as AuditEntryDto[]
+    } catch {
+      return []
+    }
+  },
+
   async getDefaultNotificationSettings(): Promise<NotificationSettingsDto> {
     return createDefaultNotificationSettings()
   },
@@ -760,7 +839,22 @@ export const httpClient = {
   },
 
   async updateNotificationSettings(payload: UpdateNotificationSettingsDto): Promise<NotificationSettingsDto> {
+    const previous = await httpClient.getNotificationSettings()
     localStorage.setItem(STORAGE_KEY_NOTIFICATION_SETTINGS, JSON.stringify(payload))
+    const flatten = (settings: NotificationSettingsDto) => ({
+      deadline_days: settings.deadline_days,
+      ...Object.fromEntries(Object.entries(settings.rules).flatMap(([kind, rule]) => [
+        [`${kind}.enabled`, rule.enabled],
+        [`${kind}.template`, rule.template],
+      ])),
+    })
+    const labels: Record<string, string> = { deadline_days: 'Напоминать за, дней' }
+    for (const kind of Object.keys(payload.rules)) {
+      labels[`${kind}.enabled`] = `${kind}: включено`
+      labels[`${kind}.template`] = `${kind}: текст`
+    }
+    const changes = describeChanges(flatten(previous), flatten(payload), labels)
+    if (changes.before) writeAudit({ action: 'notification_settings_updated', object_type: 'settings', object_label: 'Уведомления', ...changes })
     return Promise.resolve({ ...payload })
   },
 
@@ -774,7 +868,10 @@ export const httpClient = {
   },
 
   async updateHelpSettings(payload: UpdateHelpSettingsDto): Promise<HelpSettingsDto> {
+    const previous = await httpClient.getHelpSettings()
     localStorage.setItem(STORAGE_KEY_HELP_SETTINGS, JSON.stringify(payload))
+    const changes = describeChanges(previous, payload, { message: 'Текст', fallback_phone: 'Общий телефон', fallback_email: 'Общий email' })
+    if (changes.before) writeAudit({ action: 'help_settings_updated', object_type: 'settings', object_label: 'Справочная служба', ...changes })
     return Promise.resolve({ ...payload })
   },
 
@@ -798,9 +895,14 @@ export const httpClient = {
     const settings = getStoredReportFormSettings()
     const index = settings.findIndex((item) => item.form_code === formCode)
     if (index === -1) throw new Error('Report form settings not found')
+    const previous = settings[index]
     const updated = { ...settings[index], ...payload }
     settings[index] = updated
     localStorage.setItem(STORAGE_KEY_REPORT_FORM_SETTINGS, JSON.stringify(settings))
+    const changes = describeChanges(previous, updated, FORM_SETTINGS_AUDIT_LABELS)
+    if (changes.before) {
+      writeAudit({ action: 'form_settings_updated', object_type: 'settings', object_id: formCode, object_label: `Форма ${formCode}`, ...changes })
+    }
     return Promise.resolve(updated)
   },
 
@@ -809,9 +911,13 @@ export const httpClient = {
     const cleanLogin = login.trim().toLowerCase()
     const user = users.find((u) => u.login.toLowerCase() === cleanLogin || (u.phone && u.phone.includes(login.trim())))
 
-    if (!user) return null
+    if (!user) {
+      writeAudit({ action: 'login_failed', object_type: 'session', object_label: login.trim(), details: 'Пользователь не найден' }, null)
+      return null
+    }
 
     if (user.deleted_at) {
+      writeAudit({ action: 'login_failed', object_type: 'session', object_id: user.id, object_label: user.login, details: 'Учётная запись деактивирована' }, null)
       throw new Error('Учетная запись деактивирована администратором и перенесена в архив.')
     }
 
@@ -821,6 +927,8 @@ export const httpClient = {
       farm = farms.find((f) => f.id === user.farm_id)
     }
 
+    auditActor = { id: user.id, name: user.name, role: user.role }
+    writeAudit({ action: 'login', object_type: 'session', object_id: user.id, object_label: user.login })
     return { user, farm }
   },
 
@@ -904,6 +1012,13 @@ export const httpClient = {
 
     users.push(newUser)
     saveStoredUsers(users)
+    writeAudit({
+      action: 'user_created',
+      object_type: 'user',
+      object_id: newUser.id,
+      object_label: `${newUser.name} (${newUser.login})`,
+      details: `Роль: ${newUser.role === 'admin' ? 'администратор' : newUser.role === 'specialist' ? 'специалист' : 'фермер'}`,
+    })
     return Promise.resolve(newUser)
   },
 
@@ -926,6 +1041,8 @@ export const httpClient = {
     }
     users[userIndex] = updatedUser
     saveStoredUsers(users)
+    const userChanges = describeChanges(currentUser, updatedUser, USER_AUDIT_LABELS)
+    let farmChanges: { before?: string; after?: string } = {}
 
     if (currentUser.farm_id) {
       const farms = getStoredFarms()
@@ -945,6 +1062,7 @@ export const httpClient = {
         }
         farms[farmIndex] = updatedFarm
         saveStoredFarms(farms)
+        farmChanges = describeChanges(currentFarm, updatedFarm, FARM_AUDIT_LABELS)
 
         const reports = getStoredReports().map((report) => report.farm_id === updatedFarm.id
           ? {
@@ -959,6 +1077,14 @@ export const httpClient = {
       }
     }
 
+    writeAudit({
+      action: 'user_updated',
+      object_type: 'user',
+      object_id: updatedUser.id,
+      object_label: `${updatedUser.name} (${updatedUser.login})`,
+      before: [userChanges.before, farmChanges.before].filter(Boolean).join('\n') || undefined,
+      after: [userChanges.after, farmChanges.after].filter(Boolean).join('\n') || undefined,
+    })
     return Promise.resolve(updatedUser)
   },
 
@@ -968,6 +1094,7 @@ export const httpClient = {
     if (user) {
       user.deleted_at = new Date().toISOString()
       saveStoredUsers(users)
+      writeAudit({ action: 'user_deleted', object_type: 'user', object_id: user.id, object_label: `${user.name} (${user.login})` })
 
       if (user.farm_id) {
         const farms = getStoredFarms()
@@ -987,6 +1114,7 @@ export const httpClient = {
     if (user) {
       user.deleted_at = null
       saveStoredUsers(users)
+      writeAudit({ action: 'user_restored', object_type: 'user', object_id: user.id, object_label: `${user.name} (${user.login})` })
 
       if (user.farm_id) {
         const farms = getStoredFarms()
@@ -1010,9 +1138,14 @@ export const httpClient = {
     if (index === -1) {
       throw new Error(`Farm not found: ${farmId}`)
     }
+    const previous = farms[index]
     const updated: FarmDto = { ...farms[index], phone: payload.phone, contact_person: payload.contact_person }
     farms[index] = updated
     saveStoredFarms(farms)
+    const changes = describeChanges(previous, updated, { phone: 'Телефон', contact_person: 'Контактное лицо' })
+    if (changes.before) {
+      writeAudit({ action: 'farm_contacts_updated', object_type: 'farm', object_id: farmId, object_label: updated.name, ...changes })
+    }
 
     const users = getStoredUsers()
     const userIndex = users.findIndex((user) => user.farm_id === farmId)
@@ -1083,6 +1216,7 @@ export const httpClient = {
     report.history = [createHistoryEvent(report, 'created', 'farmer', 'draft')]
     reports.push(report)
     saveStoredReports(reports)
+    writeAudit({ action: 'report_created', object_type: 'report', object_id: report.id, object_label: reportAuditLabel(report) })
     return Promise.resolve(report)
   },
 
@@ -1142,6 +1276,13 @@ export const httpClient = {
     }
     all[index] = updated
     saveStoredReports(all)
+    writeAudit({
+      action: 'report_submitted',
+      object_type: 'report',
+      object_id: updated.id,
+      object_label: reportAuditLabel(updated),
+      details: updated.registration_number ? `Регистрационный номер: ${updated.registration_number}` : undefined,
+    })
     return Promise.resolve(updated)
   },
 
@@ -1175,6 +1316,16 @@ export const httpClient = {
     }
     all[index] = updated
     saveStoredReports(all)
+    const rowsNote = dto.action === 'reject' && dto.revision_rows?.length
+      ? `Строки к уточнению: ${dto.revision_rows.map((row) => row.row_code).join(', ')}`
+      : undefined
+    writeAudit({
+      action: dto.action === 'approve' ? 'report_approved' : 'report_returned',
+      object_type: 'report',
+      object_id: updated.id,
+      object_label: reportAuditLabel(updated),
+      details: [dto.action === 'reject' ? dto.revision_comment : undefined, rowsNote].filter(Boolean).join('\n') || undefined,
+    })
     return Promise.resolve(updated)
   },
 }
