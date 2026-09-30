@@ -799,6 +799,7 @@ export const httpClient = {
       phone: payload.phone,
       email: payload.email,
       district: payload.district,
+      districts: payload.districts ?? (payload.district ? [payload.district] : []),
       farm_id: farmId,
       created_at: new Date().toISOString(),
       deleted_at: null,
@@ -824,6 +825,7 @@ export const httpClient = {
       phone: payload.phone || undefined,
       email: payload.email || undefined,
       district: payload.district,
+      districts: payload.districts ?? (payload.district ? [payload.district] : currentUser.districts),
     }
     users[userIndex] = updatedUser
     saveStoredUsers(users)

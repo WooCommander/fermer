@@ -10,6 +10,7 @@ export function toUserAccount(dto: UserDto): UserAccount {
     phone: dto.phone,
     email: dto.email,
     district: dto.district,
+    districts: dto.districts ?? (dto.district ? [dto.district] : []),
     farmId: dto.farm_id,
     createdAt: dto.created_at,
     deletedAt: dto.deleted_at ?? null,

@@ -6,6 +6,7 @@ export interface UserDto {
   phone?: string
   email?: string
   district?: string
+  districts?: string[]
   farm_id?: string
   created_at: string
   deleted_at?: string | null
@@ -19,6 +20,7 @@ export interface CreateUserDto {
   phone?: string
   email?: string
   district?: string
+  districts?: string[]
   farm_name?: string
   fiscal_code?: string
   activity_type?: 'crops' | 'livestock' | 'mixed'
@@ -31,6 +33,7 @@ export interface UpdateUserDto {
   phone?: string
   email?: string
   district?: string
+  districts?: string[]
   farm_name?: string
   fiscal_code?: string
   activity_type?: 'crops' | 'livestock' | 'mixed'

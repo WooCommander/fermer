@@ -8,6 +8,7 @@ export interface UserAccount {
   phone?: string
   email?: string
   district?: string
+  districts?: string[]
   farmId?: string
   createdAt: string
   deletedAt?: string | null

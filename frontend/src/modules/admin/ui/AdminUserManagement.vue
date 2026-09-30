@@ -213,6 +213,7 @@ function onSubmitUser(): void {
     phone,
     email,
     district: formDistrict.value,
+    districts: modalRole.value === 'specialist' ? [formDistrict.value] : undefined,
   }
 
   if (modalRole.value === 'farmer') {

@@ -74,6 +74,10 @@ export class AppService {
     } else if (user.role === 'specialist') {
       this.authState.setCurrentFarm(null)
       await this.loadReviewReports()
+      const districts = user.districts ?? (user.district ? [user.district] : [])
+      if (!districts.includes('all')) {
+        this.reviewState.setReports(this.reviewState.state.value.reports.filter((report) => districts.includes(report.district)))
+      }
     } else if (user.role === 'admin') {
       this.authState.setCurrentFarm(null)
       await this.loadAdminUsers()

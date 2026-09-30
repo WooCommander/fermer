@@ -33,16 +33,19 @@ const districts = computed(() => {
 })
 
 const filteredReports = computed(() => {
+  const priority: Record<string, number> = { submitted: 0, needs_revision: 1, in_progress: 2, draft: 2, approved: 3 }
   return props.reports.filter((r) => {
     const matchDistrict = props.filterDistrict === 'all' || r.district === props.filterDistrict
-    const matchStatus = props.filterStatus === 'all' || r.status === props.filterStatus
+    const matchStatus = props.filterStatus === 'all'
+      || r.status === props.filterStatus
+      || (props.filterStatus === 'not_submitted' && (r.status === 'draft' || r.status === 'in_progress'))
     const matchSearch =
       !props.filterSearch ||
       r.farmName.toLowerCase().includes(props.filterSearch.toLowerCase()) ||
       r.fiscalCode.includes(props.filterSearch) ||
       r.formCode.toLowerCase().includes(props.filterSearch.toLowerCase())
     return matchDistrict && matchStatus && matchSearch
-  })
+  }).sort((first, second) => priority[first.status] - priority[second.status] || new Date(second.updatedAt).getTime() - new Date(first.updatedAt).getTime())
 })
 
 const stats = computed(() => {
@@ -78,17 +81,21 @@ function exportFilteredReports(): void {
         <span class="stat-num">{{ stats.total }}</span>
         <span class="stat-label">Всего отчетов</span>
       </div>
-      <div class="stat-card highlight-submitted">
+      <div class="stat-card highlight-submitted clickable" @click="emit('updateStatus', 'submitted')">
         <span class="stat-num">{{ stats.submitted }}</span>
         <span class="stat-label">Требуют проверки</span>
       </div>
-      <div class="stat-card highlight-approved">
+      <div class="stat-card highlight-approved clickable" @click="emit('updateStatus', 'approved')">
         <span class="stat-num">{{ stats.approved }}</span>
         <span class="stat-label">Принято</span>
       </div>
-      <div class="stat-card highlight-revision">
+      <div class="stat-card highlight-revision clickable" @click="emit('updateStatus', 'needs_revision')">
         <span class="stat-num">{{ stats.needsRevision }}</span>
         <span class="stat-label">На уточнении</span>
+      </div>
+      <div class="stat-card highlight-progress clickable" @click="emit('updateStatus', 'not_submitted')">
+        <span class="stat-num">{{ stats.inProgress }}</span>
+        <span class="stat-label">Не отправлены</span>
       </div>
     </div>
 
@@ -206,6 +213,16 @@ function exportFilteredReports(): void {
   gap: 0.25rem;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
 
+  &.clickable {
+    cursor: pointer;
+    transition: border-color 0.15s ease, transform 0.15s ease;
+
+    &:hover {
+      border-color: #94a3b8;
+      transform: translateY(-1px);
+    }
+  }
+
   .stat-num {
     font-size: 1.6rem;
     font-weight: 800;
@@ -237,6 +254,11 @@ function exportFilteredReports(): void {
     .stat-num {
       color: #d97706;
     }
+  }
+
+  &.highlight-progress {
+    border-left: 4px solid #94a3b8;
+    .stat-num { color: #475569; }
   }
 }
 
