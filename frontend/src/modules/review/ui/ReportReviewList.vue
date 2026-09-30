@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import type { ReportUIModel } from '@/shared/types'
 import { AppBadge, AppButton } from '@/shared/ui'
+import { downloadCsv, formatStatusName } from '@/shared/lib'
 
 interface Props {
   reports: ReportUIModel[]
@@ -52,6 +53,21 @@ const stats = computed(() => {
   const inProgress = props.reports.filter((r) => r.status === 'in_progress' || r.status === 'draft').length
   return { total, submitted, approved, needsRevision, inProgress }
 })
+
+function exportFilteredReports(): void {
+  const date = new Date().toISOString().slice(0, 10)
+  downloadCsv(`agrostat-reports-${date}.csv`,
+    ['Хозяйство', 'Фискальный код', 'Район', 'Форма', 'Период', 'Статус', 'Обновлено'],
+    filteredReports.value.map((report) => [
+      report.farmName,
+      report.fiscalCode,
+      report.district,
+      report.formCode,
+      report.period,
+      formatStatusName(report.status),
+      new Date(report.updatedAt).toLocaleString('ru-RU'),
+    ]))
+}
 </script>
 
 <template>
@@ -114,6 +130,12 @@ const stats = computed(() => {
           <option value="needs_revision">Требуют уточнения</option>
           <option value="approved">Приняты</option>
         </select>
+      </div>
+
+      <div class="export-group">
+        <AppButton size="sm" variant="secondary" :disabled="filteredReports.length === 0" @click="exportFilteredReports">
+          Скачать CSV ({{ filteredReports.length }})
+        </AppButton>
       </div>
     </div>
 
@@ -240,6 +262,11 @@ const stats = computed(() => {
     font-weight: 600;
     color: #64748b;
   }
+}
+
+.export-group {
+  display: flex;
+  align-items: flex-end;
 }
 
 .filter-input,

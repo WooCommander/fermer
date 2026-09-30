@@ -29,6 +29,8 @@ const modalRole = ref<UserRole>('specialist')
 const userToDelete = ref<UserAccount | null>(null)
 const editingUser = ref<UserAccount | null>(null)
 const isEditing = computed(() => editingUser.value !== null)
+const searchQuery = ref('')
+const filterDistrict = ref('all')
 
 function requestDeleteUser(user: UserAccount): void {
   userToDelete.value = user
@@ -68,6 +70,10 @@ const districtsList = [
   'Центральный аппарат (Все районы)',
 ]
 
+const availableDistricts = computed(() => Array.from(new Set(props.users
+  .map((user) => user.district)
+  .filter((district): district is string => Boolean(district)))))
+
 const stats = computed(() => {
   const activeUsers = props.users.filter((u) => !u.deletedAt)
   const total = activeUsers.length
@@ -79,12 +85,21 @@ const stats = computed(() => {
 })
 
 const filteredUsers = computed(() => {
-  if (activeTab.value === 'deactivated') {
-    return props.users.filter((u) => !!u.deletedAt)
-  }
-  const activeUsers = props.users.filter((u) => !u.deletedAt)
-  if (activeTab.value === 'all') return activeUsers
-  return activeUsers.filter((u) => u.role === activeTab.value)
+  const usersByStatus = activeTab.value === 'deactivated'
+    ? props.users.filter((user) => !!user.deletedAt)
+    : props.users.filter((user) => !user.deletedAt)
+  const usersByRole = activeTab.value === 'all' || activeTab.value === 'deactivated'
+    ? usersByStatus
+    : usersByStatus.filter((user) => user.role === activeTab.value)
+  const search = searchQuery.value.trim().toLowerCase()
+
+  return usersByRole.filter((user) => {
+    const matchesDistrict = filterDistrict.value === 'all' || user.district === filterDistrict.value
+    const matchesSearch = !search || [user.name, user.login, user.phone, user.email, user.district]
+      .filter(Boolean)
+      .some((value) => value!.toLowerCase().includes(search))
+    return matchesDistrict && matchesSearch
+  })
 })
 
 function openCreateModal(role: 'specialist' | 'farmer'): void {
@@ -132,23 +147,59 @@ function handleFormToggle(code: string): void {
 
 function onSubmitUser(): void {
   formError.value = ''
-  if (!formName.value.trim() || !formLogin.value.trim()) {
-    formError.value = 'Заполните обязательные поля: ФИО/Название и Логин'
+  const name = formName.value.trim()
+  const login = formLogin.value.trim()
+  const phone = formPhone.value.trim()
+  const email = formEmail.value.trim()
+  const fiscalCode = formFiscalCode.value.trim()
+
+  if (!name || !login) {
+    formError.value = 'Заполните обязательные поля: ФИО/название и логин'
     return
+  }
+  if (!/^[a-zа-яё0-9._-]{3,}$/i.test(login)) {
+    formError.value = 'Логин должен содержать не менее 3 букв, цифр или символов . _ -'
+    return
+  }
+  if (props.users.some((user) => user.id !== editingUser.value?.id && user.login.toLowerCase() === login.toLowerCase())) {
+    formError.value = 'Пользователь с таким логином уже существует'
+    return
+  }
+  if (phone && !/^\+?373\d{8}$/.test(phone.replace(/[\s()-]/g, ''))) {
+    formError.value = 'Укажите номер в формате +373 XX XXX XXX'
+    return
+  }
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    formError.value = 'Укажите корректный email'
+    return
+  }
+  if (modalRole.value === 'farmer') {
+    if (!formFarmName.value.trim()) {
+      formError.value = 'Укажите наименование хозяйства'
+      return
+    }
+    if (!/^\d{10}$/.test(fiscalCode)) {
+      formError.value = 'Фискальный код должен состоять из 10 цифр'
+      return
+    }
+    if (formAssignedForms.value.length === 0) {
+      formError.value = 'Назначьте хотя бы одну форму отчётности'
+      return
+    }
   }
 
   const payload: CreateUserDto = {
-    name: formName.value.trim(),
-    login: formLogin.value.trim(),
+    name,
+    login,
     role: modalRole.value,
-    phone: formPhone.value.trim(),
-    email: formEmail.value.trim(),
+    phone,
+    email,
     district: formDistrict.value,
   }
 
   if (modalRole.value === 'farmer') {
     payload.farm_name = formFarmName.value.trim() || formName.value.trim()
-    payload.fiscal_code = formFiscalCode.value.trim() || formLogin.value.trim()
+    payload.fiscal_code = fiscalCode
     payload.activity_type = formActivityType.value
     payload.assigned_forms = [...formAssignedForms.value]
   }
@@ -239,6 +290,21 @@ function onSubmitUser(): void {
     </div>
 
     <!-- Таблица пользователей -->
+    <div class="admin-filters">
+      <input
+        v-model="searchQuery"
+        type="search"
+        class="admin-filter-input"
+        placeholder="Поиск по имени, логину, телефону или email"
+      />
+      <select v-model="filterDistrict" class="admin-filter-select">
+        <option value="all">Все районы</option>
+        <option v-for="district in availableDistricts" :key="district" :value="district">
+          {{ district }}
+        </option>
+      </select>
+    </div>
+
     <div class="table-card">
       <table class="users-table">
         <thead>
@@ -538,6 +604,30 @@ function onSubmitUser(): void {
 .create-buttons {
   display: flex;
   gap: 0.75rem;
+}
+
+.admin-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.admin-filter-input,
+.admin-filter-select {
+  min-height: 38px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 0.45rem 0.7rem;
+  font: inherit;
+}
+
+.admin-filter-input {
+  flex: 1 1 280px;
+}
+
+.admin-filter-select {
+  flex: 0 1 260px;
 }
 
 .table-card {
