@@ -1,8 +1,8 @@
 import type { FarmDto, ReportDto, SaveDraftDto, SubmitReportDto, ReviewReportDto, UserDto, CreateUserDto } from './dto'
 
-const STORAGE_KEY_REPORTS = 'agrostat_reports_v3'
-const STORAGE_KEY_FARMS = 'agrostat_farms_v3'
-const STORAGE_KEY_USERS = 'agrostat_users_v3'
+const STORAGE_KEY_REPORTS = 'agrostat_reports_v4'
+const STORAGE_KEY_FARMS = 'agrostat_farms_v4'
+const STORAGE_KEY_USERS = 'agrostat_users_v4'
 
 const initialFarms: FarmDto[] = [
   {
@@ -65,6 +65,16 @@ const initialUsers: UserDto[] = [
     created_at: new Date(Date.now() - 86400000 * 20).toISOString(),
   },
   {
+    id: 'usr-farmer-3',
+    login: '0200011294',
+    name: 'Ковальчук Михаил Дмитриевич (ООО «МясоМолПром»)',
+    role: 'farmer',
+    phone: '+373 779 44-556',
+    district: 'Рыбницкий район',
+    farm_id: 'farm-3',
+    created_at: new Date(Date.now() - 86400000 * 15).toISOString(),
+  },
+  {
     id: 'usr-spec-1',
     login: 'specialist_slobodzeya',
     name: 'Григорьева Елена Николаевна',
@@ -96,8 +106,9 @@ const initialUsers: UserDto[] = [
 ]
 
 const initialReports: ReportDto[] = [
+  // 1. ООО «Агро-Нива» (Растениеводство) - Форма 1 и Форма 2
   {
-    id: 'rep-1',
+    id: 'rep-farm1-1',
     farm_id: 'farm-1',
     farm_name: 'ООО «Агро-Нива»',
     fiscal_code: '0200034125',
@@ -119,7 +130,9 @@ const initialReports: ReportDto[] = [
       '020': 180.0,
       '021': 60.0,
       '024': 120.0,
+      '039': 95.0,
       '040': 95.0,
+      '062': 23.5,
       '063': 15.0,
       '066': 8.5,
       '069': 5.0,
@@ -137,6 +150,79 @@ const initialReports: ReportDto[] = [
       '150': 440.0,
       '160': 500.0,
       '161': 500.0,
+    },
+    row_comments: {},
+    confirmed_warnings: {},
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: 'rep-farm1-2',
+    farm_id: 'farm-1',
+    farm_name: 'ООО «Агро-Нива»',
+    fiscal_code: '0200034125',
+    district: 'Слободзейский район',
+    form_code: '2-фермер',
+    form_title: 'Отчет о сборе урожая сельскохозяйственных культур',
+    period: '2026 год',
+    year: 2026,
+    status: 'draft',
+    values: {
+      '100': 180.0,
+      '101': 7200.0,
+      '102': 100.0,
+      '103': 4500.0,
+      '104': 30.0,
+      '105': 1050.0,
+      '106': 50.0,
+      '107': 1650.0,
+      '200': 95.0,
+      '201': 2375.0,
+      '202': 95.0,
+      '203': 2375.0,
+    },
+    previous_values: {
+      '100': 175.0,
+      '101': 6880.0,
+      '200': 90.0,
+      '201': 2160.0,
+    },
+    row_comments: {},
+    confirmed_warnings: {},
+    updated_at: new Date(Date.now() - 1800000).toISOString(),
+  },
+
+  // 2. ООО «МясоМолПром» (Животноводство) - Форма 3
+  {
+    id: 'rep-farm3-1',
+    farm_id: 'farm-3',
+    farm_name: 'ООО «МясоМолПром»',
+    fiscal_code: '0200011294',
+    district: 'Рыбницкий район',
+    form_code: '3-фермер',
+    form_title: 'Отчет о производстве продукции животноводства и численности скота',
+    period: '2026 год',
+    year: 2026,
+    status: 'in_progress',
+    values: {
+      '010': 340,
+      '011': 160,
+      '012': 75,
+      '020': 520,
+      '021': 45,
+      '060': 145,
+      '061': 480,
+      '070': 420.5,
+      '100': 7840.0,
+      '160': 650.0,
+      '161': 380.0,
+      '162': 270.0,
+      '170': 7200.0,
+    },
+    previous_values: {
+      '010': 325,
+      '011': 155,
+      '020': 500,
+      '100': 7500.0,
     },
     row_comments: {},
     confirmed_warnings: {},

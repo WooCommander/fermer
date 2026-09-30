@@ -42,7 +42,7 @@ function quickSelect(userLogin: string): void {
       <div class="auth-header">
         <div class="logo-icon">🌾</div>
         <h1>Агро<span>Стат</span></h1>
-        <p class="subtitle">Государственная информационная система сбора статистической отчетности</p>
+        <p class="subtitle">Государственная информационная система сельскохозяйственной отчетности</p>
       </div>
 
       <AppAlert v-if="props.error || localError" variant="error" title="Ошибка входа">
@@ -53,7 +53,7 @@ function quickSelect(userLogin: string): void {
         <AppInput
           v-model="login"
           label="Логин / Фискальный код / Email:"
-          placeholder="Например: 0200034125 или specialist_slobodzeya"
+          placeholder="Например: 0200034125 или 0200011294"
           type="text"
         />
 
@@ -71,32 +71,60 @@ function quickSelect(userLogin: string): void {
           :loading="props.isLoading"
           class="submit-btn"
         >
-          Войти в систему →
+          Войти в личный кабинет →
         </AppButton>
       </form>
 
-      <!-- Быстрый вход в 3 разных кабинета для демонстрации и проверки -->
+      <!-- Быстрый вход под разными типами хозяйств и ролями -->
       <div class="demo-roles-section">
         <div class="divider">
-          <span>Выберите роль для быстрого входа</span>
+          <span>Быстрый вход для проверки различных типов хозяйств</span>
         </div>
 
         <div class="roles-cards-grid">
-          <!-- 1. Фермер -->
+          <!-- 1. Растениеводство -->
           <button
             type="button"
             class="role-card-btn role-farmer"
             @click="quickSelect('0200034125')"
           >
-            <div class="role-icon">🚜</div>
+            <div class="role-icon">🌾</div>
             <div class="role-desc">
-              <strong>Фермер / КФХ</strong>
-              <span>ООО «Агро-Нива» (ФК: 0200034125)</span>
-              <small>Заполнение и отправка отчетов, архив, замечания</small>
+              <strong>Растениеводство: ООО «Агро-Нива»</strong>
+              <span>ФК: 0200034125 • Форма 1 (Сев) и Форма 2 (Урожай)</span>
+              <small>Посевы зерновых, подсолнечника, овощей, садов и баланс пашни</small>
             </div>
           </button>
 
-          <!-- 2. Специалист статистики -->
+          <!-- 2. Животноводство -->
+          <button
+            type="button"
+            class="role-card-btn role-farmer"
+            @click="quickSelect('0200011294')"
+          >
+            <div class="role-icon">🐄</div>
+            <div class="role-desc">
+              <strong>Животноводство: ООО «МясоМолПром»</strong>
+              <span>ФК: 0200011294 • Форма 3 (Животноводство)</span>
+              <small>Поголовье КРС, коров, свиней, надой молока, производство мяса</small>
+            </div>
+          </button>
+
+          <!-- 3. Смешанное хозяйство -->
+          <button
+            type="button"
+            class="role-card-btn role-farmer"
+            @click="quickSelect('0200089452')"
+          >
+            <div class="role-icon">🚜</div>
+            <div class="role-desc">
+              <strong>Смешанное хозяйство: КФХ «Золотой Колос»</strong>
+              <span>ФК: 0200089452 • Формы 1, 2 и 3</span>
+              <small>Растениеводство + Животноводство одновременно</small>
+            </div>
+          </button>
+
+          <!-- 4. Специалист статистики -->
           <button
             type="button"
             class="role-card-btn role-specialist"
@@ -104,13 +132,13 @@ function quickSelect(userLogin: string): void {
           >
             <div class="role-icon">💼</div>
             <div class="role-desc">
-              <strong>Специалист статистики</strong>
+              <strong>Специалист статистики (Инспектор)</strong>
               <span>Григорьева Е.Н. (Слободзейский р-н)</span>
-              <small>Реестр сданных отчетов, проверка, возврат/прием</small>
+              <small>Проверка всех типов отчетов, формул и принятие</small>
             </div>
           </button>
 
-          <!-- 3. Администратор -->
+          <!-- 5. Администратор -->
           <button
             type="button"
             class="role-card-btn role-admin"
@@ -119,8 +147,7 @@ function quickSelect(userLogin: string): void {
             <div class="role-icon">⚙️</div>
             <div class="role-desc">
               <strong>Администратор системы</strong>
-              <span>Управление доступом</span>
-              <small>Добавление специалистов, фермеров, назначение форм</small>
+              <span>Управление пользователями и назначением форм хозяйствам</span>
             </div>
           </button>
         </div>
@@ -143,7 +170,7 @@ function quickSelect(userLogin: string): void {
   border-radius: 16px;
   border: 1px solid #e2e8f0;
   box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.06);
-  max-width: 520px;
+  max-width: 580px;
   width: 100%;
   padding: 2.25rem 2rem;
   display: flex;
@@ -223,24 +250,24 @@ function quickSelect(userLogin: string): void {
 .roles-cards-grid {
   display: flex;
   flex-direction: column;
-  gap: 0.65rem;
+  gap: 0.55rem;
 }
 
 .role-card-btn {
   display: flex;
   align-items: flex-start;
   gap: 0.85rem;
-  padding: 0.85rem 1rem;
+  padding: 0.75rem 0.95rem;
   background: #f8fafc;
   border: 1.5px solid #e2e8f0;
   border-radius: 10px;
   cursor: pointer;
   text-align: left;
-  transition: all 0.2s;
+  transition: all 0.15s;
   font-family: inherit;
 
   .role-icon {
-    font-size: 1.6rem;
+    font-size: 1.5rem;
     line-height: 1;
     flex-shrink: 0;
   }
@@ -251,12 +278,12 @@ function quickSelect(userLogin: string): void {
     gap: 0.15rem;
 
     strong {
-      font-size: 0.92rem;
+      font-size: 0.9rem;
       color: #0f172a;
     }
 
     span {
-      font-size: 0.82rem;
+      font-size: 0.8rem;
       color: #475569;
       font-weight: 600;
     }
