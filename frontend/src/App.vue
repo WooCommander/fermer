@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, computed } from 'vue'
+import { onMounted, computed, ref } from 'vue'
 import { appService, AppHeader } from '@/app'
 import { useAuthState, AuthLoginForm } from '@/modules/auth'
 import { useReportingState, getFormSchemaByCode, FormWizard, FarmerDashboard, reportingService } from '@/modules/reporting'
@@ -12,6 +12,7 @@ const authState = useAuthState()
 const reportingState = useReportingState()
 const reviewState = useReviewState()
 const adminState = useAdminState()
+const adminSection = ref<'users' | 'reporting'>('users')
 
 onMounted(async () => {
   await appService.initializeApp()
@@ -212,7 +213,12 @@ function onUpdateReportFormSettings(settings: ReportFormSettings): void {
 
       <!-- 3. КАБИНЕТ АДМИНИСТРАТОРА СИСТЕМЫ (Только для роли 'admin') -->
       <template v-else-if="currentUser.role === 'admin'">
+        <div class="admin-section-tabs">
+          <button type="button" :class="{ active: adminSection === 'users' }" @click="adminSection = 'users'">Пользователи и хозяйства</button>
+          <button type="button" :class="{ active: adminSection === 'reporting' }" @click="adminSection = 'reporting'">Настройки отчётности</button>
+        </div>
         <AdminUserManagement
+          v-if="adminSection === 'users'"
           :users="adminState.state.value.users"
           :farms="authState.state.value.farms"
           :is-loading="adminState.state.value.isLoading"
@@ -222,6 +228,7 @@ function onUpdateReportFormSettings(settings: ReportFormSettings): void {
           @restore-user="onRestoreAdminUser"
         />
         <AdminReportSettings
+          v-else
           :settings="reportingState.state.value.formSettings"
           @update="onUpdateReportFormSettings"
         />
@@ -274,5 +281,33 @@ function onUpdateReportFormSettings(settings: ReportFormSettings): void {
   display: flex;
   flex-direction: column;
   gap: 1rem;
+}
+
+.admin-section-tabs {
+  display: flex;
+  gap: 0.35rem;
+  width: fit-content;
+  margin-bottom: 1rem;
+  padding: 0.3rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #ffffff;
+
+  button {
+    padding: 0.55rem 0.85rem;
+    border: 0;
+    border-radius: 7px;
+    background: transparent;
+    color: #64748b;
+    font: inherit;
+    font-size: 0.86rem;
+    font-weight: 700;
+    cursor: pointer;
+
+    &.active {
+      color: #ffffff;
+      background: #059669;
+    }
+  }
 }
 </style>
