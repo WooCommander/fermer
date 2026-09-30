@@ -81,6 +81,7 @@ function onSendRevisionConfirm(): void {
       <div class="meta-pills">
         <span class="pill">Форма: <b>{{ props.report.formCode }}</b></span>
         <span class="pill">Период: <b>{{ props.report.period }}</b></span>
+        <span v-if="props.report.registrationNumber" class="pill">№: <b>{{ props.report.registrationNumber }}</b></span>
         <span v-if="props.report.submittedAt" class="pill">Сдан: <b>{{ new Date(props.report.submittedAt).toLocaleDateString() }}</b></span>
       </div>
     </div>

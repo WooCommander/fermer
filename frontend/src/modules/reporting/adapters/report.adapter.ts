@@ -27,6 +27,7 @@ export function toReportUIModel(dto: ReportDto): ReportUIModel {
       comment: event.comment,
     })),
     revisionComment: dto.revision_comment,
+    registrationNumber: dto.registration_number,
     revisionRows: (dto.revision_rows ?? []).map((row) => ({ rowCode: row.row_code, comment: row.comment })),
     updatedAt: dto.updated_at,
     submittedAt: dto.submitted_at,

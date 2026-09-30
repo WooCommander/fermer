@@ -33,6 +33,7 @@ export interface ReportDto {
   history?: ReportHistoryEventDto[]
   revision_comment?: string
   revision_rows?: RevisionRowDto[]
+  registration_number?: string
   updated_at: string
   submitted_at?: string
   approved_at?: string

@@ -73,6 +73,9 @@ function onLogoutConfirm(): void {
           ← В личный кабинет
         </AppButton>
 
+        <!-- Дополнительные элементы (например, уведомления) -->
+        <slot name="actions" />
+
         <!-- Профиль пользователя -->
         <div class="user-profile-badge">
           <span class="user-avatar">

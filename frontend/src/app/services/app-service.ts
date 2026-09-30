@@ -2,10 +2,11 @@ import { authService, useAuthState } from '@/modules/auth'
 import { reportingService, useReportingState, getFormSchemaByCode } from '@/modules/reporting'
 import { reviewService, useReviewState, clearPersistedReviewView } from '@/modules/review'
 import { adminService, useAdminState } from '@/modules/admin'
+import { notificationService, useNotificationState } from '@/modules/notifications'
 import { httpClient, type CreateUserDto, type UpdateUserDto } from '@/api'
 import { toUserAccount } from '@/modules/admin/adapters/admin.adapter'
 import { toFarmProfile } from '@/modules/auth/adapters/auth.adapter'
-import type { HelpSettings, ReportUIModel, RevisionRow } from '@/shared/types'
+import type { HelpSettings, NotificationSettings, ReportUIModel, RevisionRow } from '@/shared/types'
 import type { ReportFormSettings } from '@/shared/types'
 
 const SESSION_STORAGE_KEY = 'agrostat_auth_user_id'
@@ -16,6 +17,7 @@ export class AppService {
   private reportingState = useReportingState()
   private reviewState = useReviewState()
   private adminState = useAdminState()
+  private notificationState = useNotificationState()
 
   private autosaveTimer: ReturnType<typeof setTimeout> | undefined
   private unloadGuardInstalled = false
@@ -28,6 +30,8 @@ export class AppService {
       this.authState.setFarms(farms)
       this.reportingState.setFormSettings(await reportingService.fetchFormSettings())
       this.reportingState.setHelpSettings(await reportingService.fetchHelpSettings())
+      this.notificationState.setSettings(await notificationService.fetchSettings())
+      this.notificationState.setDefaults(await notificationService.fetchDefaultSettings())
 
       const savedUserId = localStorage.getItem(SESSION_STORAGE_KEY)
       if (savedUserId) {
@@ -67,6 +71,7 @@ export class AppService {
 
   private async applyUserSession(user: import('@/shared/types').UserAccount): Promise<void> {
     this.authState.setCurrentUser(user)
+    this.notificationState.loadRead(user.id)
 
     if (user.role === 'farmer' && user.farmId) {
       const farmDto = await httpClient.getFarmById(user.farmId)
@@ -102,12 +107,22 @@ export class AppService {
     this.reportingState.setActiveReport(null)
     this.reviewState.setSelectedReport(null)
     clearPersistedReviewView()
+    this.notificationState.clearRead()
   }
 
   // --- reporting methods (для фермера) ---
-  openReport(report: ReportUIModel): void {
+  async openReport(report: ReportUIModel): Promise<void> {
+    await this.flushAutosave()
     this.reportingState.setActiveReport(report)
     this.validateCurrentReport()
+  }
+
+  async updateNotificationSettings(settings: NotificationSettings): Promise<void> {
+    this.notificationState.setSettings(await notificationService.updateSettings(settings))
+  }
+
+  markNotificationsRead(ids: string[]): void {
+    this.notificationState.markRead(ids)
   }
 
   async closeReport(): Promise<void> {
@@ -283,6 +298,7 @@ export class AppService {
     const active = this.reportingState.state.value.activeReport
     if (!active) return
 
+    if (this.reportingState.state.value.isSubmitting) return
     await this.flushAutosave()
     this.reportingState.setIsSubmitting(true)
     try {

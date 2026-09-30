@@ -248,6 +248,11 @@ function getSummaryKeyMetrics(rep: ReportUIModel): string {
             <AppBadge :status="rep.status" />
           </div>
 
+          <div v-if="rep.status === 'submitted' && rep.registrationNumber" class="card-receipt">
+            ✅ Принят системой · № <b>{{ rep.registrationNumber }}</b>
+            <span v-if="rep.submittedAt"> · {{ new Date(rep.submittedAt).toLocaleString('ru-RU', { dateStyle: 'medium', timeStyle: 'short' }) }}</span>
+          </div>
+
           <div v-if="rep.status !== 'submitted'" class="card-progress">
             <AppProgressBar :value="getProgress(rep).percent" />
             <small>Заполнено строк: {{ getProgress(rep).filled }} из {{ getProgress(rep).total }}</small>
@@ -533,6 +538,15 @@ function getSummaryKeyMetrics(rep: ReportUIModel): string {
 
   &.is-soon { color: #b45309; }
   &.is-overdue { color: #dc2626; }
+}
+
+.card-receipt {
+  padding: 0.55rem 0.75rem;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+  color: #166534;
+  font-size: 0.85rem;
 }
 
 .card-progress {

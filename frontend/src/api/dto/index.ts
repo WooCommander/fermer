@@ -1,5 +1,6 @@
 export * from './farm.dto'
 export * from './help.dto'
+export * from './notification.dto'
 export * from './report.dto'
 export * from './report-form-settings.dto'
 export * from './user.dto'

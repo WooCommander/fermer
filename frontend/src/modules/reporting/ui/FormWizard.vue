@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, ref } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import type { ReportUIModel, FormSchema, ValidationIssue } from '@/shared/types'
 import { AppButton, AppProgressBar, AppBadge, AppAlert } from '@/shared/ui'
 import FormSectionView from './FormSectionView.vue'
@@ -86,6 +86,28 @@ const revisionNotes = computed<Record<string, string>>(() => {
 const revisionItems = computed(() => {
   const titles = new Map(props.schema.sections.flatMap((section) => section.rows.map((row) => [row.code, row.title] as const)))
   return Object.entries(revisionNotes.value).map(([code, comment]) => ({ code, comment, title: titles.get(code) ?? '' }))
+})
+
+const receiptDate = computed(() => props.report.submittedAt
+  ? new Date(props.report.submittedAt).toLocaleString('ru-RU', { dateStyle: 'long', timeStyle: 'medium' })
+  : '')
+
+const numberCopied = ref(false)
+
+async function copyRegistrationNumber(): Promise<void> {
+  if (!props.report.registrationNumber) return
+  try {
+    await navigator.clipboard.writeText(props.report.registrationNumber)
+    numberCopied.value = true
+    setTimeout(() => { numberCopied.value = false }, 2000)
+  } catch {
+    // буфер обмена недоступен — номер можно выделить и скопировать вручную
+  }
+}
+
+// После отправки показываем подтверждение с начала страницы
+watch(() => props.report.status, (status, previous) => {
+  if (status === 'submitted' && previous !== 'submitted') window.scrollTo({ top: 0, behavior: 'smooth' })
 })
 
 const lastSavedTime = computed(() => props.lastSavedAt
@@ -245,13 +267,48 @@ function onConfirmSubmit(): void {
 
     <!-- ПРАВАЯ ОСНОВНАЯ КОЛОНКА: Таблица показателей и валидации -->
     <section class="wizard-main-content">
+      <!-- Подтверждение приёма: остаётся на экране, пока отчёт ждёт проверки -->
+      <section v-if="props.report.status === 'submitted'" class="receipt-card" aria-live="polite">
+        <div class="receipt-icon">✅</div>
+        <div class="receipt-body">
+          <h3>Отчёт принят системой</h3>
+          <dl class="receipt-facts">
+            <div v-if="props.report.registrationNumber">
+              <dt>Регистрационный номер</dt>
+              <dd>
+                <b class="receipt-number">{{ props.report.registrationNumber }}</b>
+                <button type="button" class="link-btn inline" @click="copyRegistrationNumber">
+                  {{ numberCopied ? 'Скопировано' : 'Копировать' }}
+                </button>
+              </dd>
+            </div>
+            <div v-if="receiptDate">
+              <dt>Дата и время приёма</dt>
+              <dd>{{ receiptDate }}</dd>
+            </div>
+            <div>
+              <dt>Форма и период</dt>
+              <dd>{{ props.report.formCode }}, {{ props.report.period }}</dd>
+            </div>
+            <div>
+              <dt>Хозяйство</dt>
+              <dd>{{ props.report.farmName }}</dd>
+            </div>
+          </dl>
+          <p class="receipt-hint">
+            Сохраните номер: по нему можно обратиться в службу статистики. Отчёт проверит специалист.
+            Если потребуется уточнение, вы увидите замечания в кабинете.
+          </p>
+        </div>
+      </section>
+
       <!-- Баннер утвержденного отчета (если из архива) -->
       <AppAlert
         v-if="props.report.status === 'approved'"
         variant="success"
         title="Официально принятый отчет (Архив)"
       >
-        Данный отчет утвержден Государственной службой статистики{{ props.report.approvedAt ? ' ' + new Date(props.report.approvedAt).toLocaleDateString('ru-RU') : '' }}. Режим просмотра.
+        Данный отчет утвержден Государственной службой статистики{{ props.report.approvedAt ? ' ' + new Date(props.report.approvedAt).toLocaleDateString('ru-RU') : '' }}.{{ props.report.registrationNumber ? ` Регистрационный номер: ${props.report.registrationNumber}.` : '' }} Режим просмотра.
       </AppAlert>
 
       <!-- Баннер замечаний инспектора -->
@@ -387,6 +444,60 @@ function onConfirmSubmit(): void {
   &:hover {
     text-decoration: underline;
   }
+}
+
+.receipt-card {
+  display: flex;
+  gap: 1rem;
+  padding: 1.25rem;
+  background: #f0fdf4;
+  border: 1px solid #86efac;
+  border-radius: 12px;
+
+  .receipt-icon {
+    font-size: 1.8rem;
+    line-height: 1;
+  }
+
+  h3 {
+    margin: 0 0 0.6rem;
+    font-size: 1.1rem;
+    color: #166534;
+  }
+}
+
+.receipt-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 0.6rem 1.5rem;
+  margin: 0;
+
+  dt {
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: #15803d;
+  }
+
+  dd {
+    margin: 0.1rem 0 0;
+    font-size: 0.92rem;
+    color: #14532d;
+  }
+}
+
+.receipt-number {
+  margin-right: 0.5rem;
+  font-family: monospace;
+  font-size: 1.05rem;
+  user-select: all;
+}
+
+.receipt-hint {
+  margin: 0.8rem 0 0;
+  font-size: 0.82rem;
+  color: #166534;
 }
 
 .revision-list {

@@ -1,11 +1,27 @@
-import type { HelpSettingsDto, HelpContactDto, UpdateHelpSettingsDto, FarmDto, ReportDto, ReportHistoryEventDto, CreateReportDto, SaveDraftDto, SubmitReportDto, ReviewReportDto, UserDto, CreateUserDto, UpdateUserDto, ReportFormSettingsDto, UpdateReportFormSettingsDto } from './dto'
+import type { NotificationSettingsDto, UpdateNotificationSettingsDto, HelpSettingsDto, HelpContactDto, UpdateHelpSettingsDto, FarmDto, ReportDto, ReportHistoryEventDto, CreateReportDto, SaveDraftDto, SubmitReportDto, ReviewReportDto, UserDto, CreateUserDto, UpdateUserDto, ReportFormSettingsDto, UpdateReportFormSettingsDto } from './dto'
 
 const STORAGE_KEY_REPORTS = 'agrostat_reports_v7'
 const STORAGE_KEY_FARMS = 'agrostat_farms_v7'
 const STORAGE_KEY_USERS = 'agrostat_users_v7'
 const STORAGE_KEY_REPORT_FORM_SETTINGS = 'agrostat_report_form_settings_v1'
 const STORAGE_KEY_HELP_SETTINGS = 'agrostat_help_settings_v1'
+const STORAGE_KEY_NOTIFICATION_SETTINGS = 'agrostat_notification_settings_v1'
+const STORAGE_KEY_REGISTRATION_COUNTER = 'agrostat_registration_counter_v1'
 const CENTRAL_OFFICE_LABEL = 'Центральный аппарат'
+
+function createDefaultNotificationSettings(): NotificationSettingsDto {
+  return {
+    deadline_days: 7,
+    rules: {
+      period_open: { enabled: true, template: 'Открыт приём отчёта {form} за {period}. Срок сдачи — до {deadline}.' },
+      deadline_soon: { enabled: true, template: 'Срок сдачи отчёта {form} за {period} — до {deadline}. Осталось дней: {days}.' },
+      deadline_overdue: { enabled: true, template: 'Срок сдачи отчёта {form} за {period} истёк {deadline}. Сдайте отчёт как можно скорее.' },
+      submitted: { enabled: true, template: 'Отчёт {form} за {period} принят системой. Регистрационный номер: {number}.' },
+      approved: { enabled: true, template: 'Отчёт {form} за {period} принят службой статистики.' },
+      returned: { enabled: true, template: 'Отчёт {form} за {period} возвращён на уточнение. {comment}' },
+    },
+  }
+}
 
 const defaultHelpSettings: HelpSettingsDto = {
   message: 'При возникновении вопросов по заполнению форм или методологии расчётов обращайтесь в отдел статистики вашего района:',
@@ -556,6 +572,18 @@ const initialReports: ReportDto[] = [
   },
 ]
 
+// Регистрационный номер присваивается при первой отправке и не меняется при повторных
+function nextRegistrationNumber(year: number): string {
+  let counter = 0
+  try {
+    counter = Number(localStorage.getItem(STORAGE_KEY_REGISTRATION_COUNTER)) || 0
+    localStorage.setItem(STORAGE_KEY_REGISTRATION_COUNTER, String(counter + 1))
+  } catch {
+    counter = Date.now() % 1_000_000
+  }
+  return `АС-${year}-${String(counter + 1).padStart(6, '0')}`
+}
+
 function createHistoryEvent(
   report: ReportDto,
   action: ReportHistoryEventDto['action'],
@@ -712,6 +740,30 @@ function saveStoredUsers(users: UserDto[]): void {
 }
 
 export const httpClient = {
+  async getDefaultNotificationSettings(): Promise<NotificationSettingsDto> {
+    return createDefaultNotificationSettings()
+  },
+
+  async getNotificationSettings(): Promise<NotificationSettingsDto> {
+    const defaults = createDefaultNotificationSettings()
+    try {
+      const stored = JSON.parse(localStorage.getItem(STORAGE_KEY_NOTIFICATION_SETTINGS) ?? 'null') as Partial<NotificationSettingsDto> | null
+      if (!stored) return defaults
+      // Новые виды уведомлений, которых нет в сохранённых настройках, берут стандартные значения
+      return {
+        deadline_days: stored.deadline_days ?? defaults.deadline_days,
+        rules: Object.fromEntries(Object.entries(defaults.rules).map(([kind, rule]) => [kind, { ...rule, ...stored.rules?.[kind] }])),
+      }
+    } catch {
+      return defaults
+    }
+  },
+
+  async updateNotificationSettings(payload: UpdateNotificationSettingsDto): Promise<NotificationSettingsDto> {
+    localStorage.setItem(STORAGE_KEY_NOTIFICATION_SETTINGS, JSON.stringify(payload))
+    return Promise.resolve({ ...payload })
+  },
+
   async getHelpSettings(): Promise<HelpSettingsDto> {
     try {
       const data = localStorage.getItem(STORAGE_KEY_HELP_SETTINGS)
@@ -1071,11 +1123,16 @@ export const httpClient = {
       throw new Error(`Report not found: ${dto.report_id}`)
     }
     const current = all[index]
+    // Повторная отправка уже сданного отчёта ничего не меняет (двойной клик, повторный запрос)
+    if (current.status === 'submitted' || current.status === 'approved') {
+      return Promise.resolve(current)
+    }
     const now = new Date().toISOString()
     const updated: ReportDto = {
       ...current,
       status: 'submitted',
       revision_rows: undefined,
+      registration_number: current.registration_number ?? nextRegistrationNumber(current.year),
       submitted_at: now,
       updated_at: now,
       history: [

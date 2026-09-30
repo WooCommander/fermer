@@ -5,14 +5,16 @@ import { useAuthState, AuthLoginForm } from '@/modules/auth'
 import { useReportingState, getFormSchemaByCode, FormWizard, FarmerDashboard, reportingService } from '@/modules/reporting'
 import { useReviewState, ReportReviewList, ReportReviewDetail } from '@/modules/review'
 import { useAdminState, AdminUserManagement, AdminReportSettings, AdminHelpSettings } from '@/modules/admin'
-import type { HelpSettings, ReportFormSettings, ReportUIModel, RevisionRow } from '@/shared/types'
+import { useNotificationState, buildNotifications, NotificationBell, AdminNotificationSettings } from '@/modules/notifications'
+import type { AppNotification, HelpSettings, NotificationSettings, ReportFormSettings, ReportUIModel, RevisionRow } from '@/shared/types'
 import type { CreateUserDto, UpdateUserDto } from '@/api'
 
 const authState = useAuthState()
 const reportingState = useReportingState()
 const reviewState = useReviewState()
 const adminState = useAdminState()
-const adminSection = ref<'users' | 'reporting' | 'help'>('users')
+const notificationState = useNotificationState()
+const adminSection = ref<'users' | 'reporting' | 'help' | 'notifications'>('users')
 
 onMounted(async () => {
   await appService.initializeApp()
@@ -29,6 +31,36 @@ const activeReport = computed(() => reportingState.state.value.activeReport)
 const activeSchema = computed(() => {
   return activeReport.value ? getFormSchemaByCode(activeReport.value.formCode) : getFormSchemaByCode('1-фермер')
 })
+
+// Лента уведомлений фермера вычисляется из его отчётов, истории и сроков форм
+const notifications = computed<AppNotification[]>(() => {
+  const farm = currentFarm.value
+  const settings = notificationState.state.value.settings
+  if (currentUser.value?.role !== 'farmer' || !farm || !settings) return []
+  return buildNotifications({
+    farm,
+    reports: reportingState.state.value.reports,
+    formSettings: reportingState.state.value.formSettings,
+    settings,
+  })
+})
+
+function onOpenNotification(notification: AppNotification): void {
+  appService.markNotificationsRead([notification.id])
+  const report = notification.reportId
+    ? reportingState.state.value.reports.find((item) => item.id === notification.reportId)
+    : undefined
+  if (report) appService.openReport(report)
+  else appService.closeReport()
+}
+
+function onMarkAllNotificationsRead(): void {
+  appService.markNotificationsRead(notifications.value.map((item) => item.id))
+}
+
+function onUpdateNotificationSettings(settings: NotificationSettings): void {
+  appService.updateNotificationSettings(settings)
+}
 
 const completionPercent = computed(() => {
   return activeReport.value ? reportingService.calculateCompletionPercent(activeReport.value) : 0
@@ -142,7 +174,17 @@ function onUpdateReportFormSettings(settings: ReportFormSettings): void {
       :is-editing-report="!!activeReport"
       @go-to-dashboard="onGoToDashboard"
       @logout="onLogout"
-    />
+    >
+      <template #actions>
+        <NotificationBell
+          v-if="currentUser?.role === 'farmer'"
+          :notifications="notifications"
+          :read-ids="notificationState.state.value.readIds"
+          @open="onOpenNotification"
+          @mark-all-read="onMarkAllNotificationsRead"
+        />
+      </template>
+    </AppHeader>
 
     <main class="app-main">
       <!-- 0. Экран аутентификации (если пользователь не вошел) -->
@@ -230,6 +272,7 @@ function onUpdateReportFormSettings(settings: ReportFormSettings): void {
           <button type="button" :class="{ active: adminSection === 'users' }" @click="adminSection = 'users'">Пользователи и хозяйства</button>
           <button type="button" :class="{ active: adminSection === 'reporting' }" @click="adminSection = 'reporting'">Настройки отчётности</button>
           <button type="button" :class="{ active: adminSection === 'help' }" @click="adminSection = 'help'">Справочная служба</button>
+          <button type="button" :class="{ active: adminSection === 'notifications' }" @click="adminSection = 'notifications'">Уведомления</button>
         </div>
         <AdminUserManagement
           v-if="adminSection === 'users'"
@@ -247,9 +290,15 @@ function onUpdateReportFormSettings(settings: ReportFormSettings): void {
           @update="onUpdateReportFormSettings"
         />
         <AdminHelpSettings
-          v-else
+          v-else-if="adminSection === 'help'"
           :settings="reportingState.state.value.helpSettings"
           @update="onUpdateHelpSettings"
+        />
+        <AdminNotificationSettings
+          v-else-if="notificationState.state.value.settings && notificationState.state.value.defaults"
+          :settings="notificationState.state.value.settings"
+          :defaults="notificationState.state.value.defaults"
+          @update="onUpdateNotificationSettings"
         />
       </template>
     </main>

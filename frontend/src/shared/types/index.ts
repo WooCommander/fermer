@@ -101,6 +101,35 @@ export interface FormSchema {
   validationRules: ValidationRule[]
 }
 
+export type NotificationKind =
+  | 'period_open'
+  | 'deadline_soon'
+  | 'deadline_overdue'
+  | 'submitted'
+  | 'approved'
+  | 'returned'
+
+export interface AppNotification {
+  id: string
+  kind: NotificationKind
+  title: string
+  text: string
+  createdAt: string
+  reportId?: string
+  formCode?: string
+  year?: number
+}
+
+export interface NotificationRuleSettings {
+  enabled: boolean
+  template: string
+}
+
+export interface NotificationSettings {
+  deadlineDays: number
+  rules: Record<NotificationKind, NotificationRuleSettings>
+}
+
 export interface HelpSettings {
   message: string
   fallbackPhone: string
@@ -165,6 +194,7 @@ export interface ReportUIModel {
   history: ReportHistoryEvent[]
   revisionComment?: string
   revisionRows?: RevisionRow[]
+  registrationNumber?: string
   updatedAt: string
   submittedAt?: string
   approvedAt?: string
