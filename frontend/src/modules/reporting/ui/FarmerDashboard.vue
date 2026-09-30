@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import type { FarmProfile, ReportFormSettings, ReportUIModel } from '@/shared/types'
 import { AppBadge, AppButton, AppAlert } from '@/shared/ui'
 import { formatActivityTypeName } from '@/shared/lib'
@@ -27,7 +27,6 @@ const activeTab = ref<'active' | 'archive'>('active')
 const showCreateDialog = ref(false)
 const selectedFormCode = ref('')
 const selectedYear = ref(new Date().getFullYear())
-const createError = ref('')
 
 // Текущие отчеты (2026 год)
 const currentReports = computed(() => {
@@ -80,17 +79,20 @@ const createUrgency = computed(() => {
   return { level: 'soon', text: `Пора подготовить форму ${next.formCode}: срок ${deadline}` }
 })
 
+// Список доступных форм зависит от года: выбранная форма должна оставаться из списка
+watch(availableForms, (forms) => {
+  if (!forms.some((form) => form.code === selectedFormCode.value)) {
+    selectedFormCode.value = forms[0]?.code ?? ''
+  }
+})
+
 function openCreateDialog(): void {
   selectedFormCode.value = availableForms.value[0]?.code ?? ''
-  createError.value = ''
   showCreateDialog.value = true
 }
 
 function createReport(): void {
-  if (!selectedFormCode.value) {
-    createError.value = 'Для выбранного периода все назначенные формы уже созданы.'
-    return
-  }
+  if (!selectedFormCode.value) return
 
   emit('createReport', selectedFormCode.value, selectedYear.value)
   showCreateDialog.value = false
@@ -279,7 +281,7 @@ function getSummaryKeyMetrics(rep: ReportUIModel): string {
           <button type="button" class="close-button" aria-label="Закрыть" @click="showCreateDialog = false">×</button>
         </div>
         <p>Выберите назначенную форму и отчётный год. Создастся пустой черновик.</p>
-        <label>
+        <label v-if="availableForms.length > 0">
           Форма
           <select v-model="selectedFormCode">
             <option v-for="form in availableForms" :key="form.code" :value="form.code">
@@ -287,11 +289,13 @@ function getSummaryKeyMetrics(rep: ReportUIModel): string {
             </option>
           </select>
         </label>
+        <p v-else class="no-forms-notice">
+          За {{ selectedYear }} год все назначенные формы уже созданы. Выберите другой год или откройте существующий отчёт.
+        </p>
         <label>
           Отчётный год
-          <input v-model.number="selectedYear" type="number" min="2020" max="2100" @change="selectedFormCode = availableForms[0]?.code ?? ''" />
+          <input v-model.number="selectedYear" type="number" min="2020" max="2100" />
         </label>
-        <p v-if="createError" class="create-error">{{ createError }}</p>
         <div class="dialog-actions">
           <AppButton variant="secondary" @click="showCreateDialog = false">Отмена</AppButton>
           <AppButton variant="primary" :disabled="!selectedFormCode" @click="createReport">Создать и заполнить</AppButton>
@@ -409,7 +413,17 @@ function getSummaryKeyMetrics(rep: ReportUIModel): string {
 .dialog-header h3 { margin: 0; color: #0f172a; font-size: 1.15rem; }
 .close-button { border: 0; background: transparent; color: #64748b; font-size: 1.5rem; cursor: pointer; line-height: 1; }
 .dialog-actions { display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1.5rem; }
-.create-dialog .create-error { margin: 0.8rem 0 0; color: #dc2626; }
+.create-dialog .no-forms-notice {
+  margin: 0.9rem 0 0;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid #fde68a;
+  border-radius: 8px;
+  background: #fffbeb;
+  color: #92400e;
+  font-size: 0.88rem;
+  line-height: 1.4;
+}
+
 
 .tabs-group {
   flex: 1;

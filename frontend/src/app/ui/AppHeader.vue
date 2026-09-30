@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { onBeforeUnmount, onMounted, ref } from 'vue'
 import type { UserAccount, FarmProfile } from '@/shared/types'
 import { AppButton, AppConfirmDialog } from '@/shared/ui'
 
@@ -22,6 +22,29 @@ const emit = defineEmits<{
 
 const showLogoutConfirm = ref(false)
 
+// Высота шапки нужна другим липким блокам (например, карточке отчёта), чтобы они прилипали под ней
+const headerEl = ref<HTMLElement | null>(null)
+let resizeObserver: ResizeObserver | undefined
+
+function publishHeaderHeight(): void {
+  if (headerEl.value) {
+    document.documentElement.style.setProperty('--app-header-height', `${headerEl.value.offsetHeight}px`)
+  }
+}
+
+onMounted(() => {
+  publishHeaderHeight()
+  if (headerEl.value && typeof ResizeObserver !== 'undefined') {
+    resizeObserver = new ResizeObserver(publishHeaderHeight)
+    resizeObserver.observe(headerEl.value)
+  }
+})
+
+onBeforeUnmount(() => {
+  resizeObserver?.disconnect()
+  document.documentElement.style.removeProperty('--app-header-height')
+})
+
 function onLogoutConfirm(): void {
   showLogoutConfirm.value = false
   emit('logout')
@@ -29,7 +52,7 @@ function onLogoutConfirm(): void {
 </script>
 
 <template>
-  <header class="app-header">
+  <header ref="headerEl" class="app-header">
     <div class="header-container">
       <div class="brand-group" @click="emit('goToDashboard')">
         <div class="brand-logo">🌾</div>
@@ -92,6 +115,9 @@ function onLogoutConfirm(): void {
 
 <style scoped lang="scss">
 .app-header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
   background: #ffffff;
   border-bottom: 1px solid #e2e8f0;
   padding: 0.75rem 1.5rem;

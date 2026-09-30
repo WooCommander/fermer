@@ -1,6 +1,6 @@
 import { authService, useAuthState } from '@/modules/auth'
 import { reportingService, useReportingState, getFormSchemaByCode } from '@/modules/reporting'
-import { reviewService, useReviewState } from '@/modules/review'
+import { reviewService, useReviewState, clearPersistedReviewView } from '@/modules/review'
 import { adminService, useAdminState } from '@/modules/admin'
 import { httpClient, type CreateUserDto, type UpdateUserDto } from '@/api'
 import { toUserAccount } from '@/modules/admin/adapters/admin.adapter'
@@ -93,6 +93,7 @@ export class AppService {
     this.reportingState.setReports([])
     this.reportingState.setActiveReport(null)
     this.reviewState.setSelectedReport(null)
+    clearPersistedReviewView()
   }
 
   // --- reporting methods (для фермера) ---

@@ -47,7 +47,7 @@ function onSendRevisionConfirm(): void {
 
 <template>
   <div class="report-review-detail">
-    <!-- Шапка инспектора -->
+    <!-- Шапка инспектора: закреплена под шапкой приложения -->
     <div class="detail-header">
       <AppButton size="sm" variant="secondary" @click="emit('back')">
         ← К списку отчетов
@@ -202,22 +202,30 @@ function onSendRevisionConfirm(): void {
 }
 
 .detail-header {
+  position: sticky;
+  top: var(--app-header-height, 64px);
+  z-index: 40;
   background: #ffffff;
   border-radius: 14px;
   border: 1px solid #e2e8f0;
-  padding: 1.25rem;
+  padding: 0.75rem 1rem;
   display: flex;
-  flex-direction: column;
-  gap: 1rem;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem 1rem;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
 }
 
 .header-main {
   display: flex;
+  flex: 1;
+  min-width: 220px;
   justify-content: space-between;
-  align-items: flex-start;
+  align-items: center;
+  gap: 0.75rem;
 
   h2 {
-    font-size: 1.3rem;
+    font-size: 1.1rem;
     font-weight: 700;
     margin: 0;
     color: #0f172a;

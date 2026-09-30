@@ -71,6 +71,8 @@ onBeforeUnmount(() => {
 const districts = computed(() => Array.from(new Set(props.reports.map((r) => r.district))).sort())
 // Регистратору с одним районом выбирать нечего — фильтр скрываем
 const showDistrictFilter = computed(() => districts.value.length > 1)
+// Сохранённый район мог перестать быть доступным (другой пользователь, другие данные) — тогда считаем «все»
+const activeDistrict = computed(() => districts.value.includes(props.filterDistrict) ? props.filterDistrict : 'all')
 
 const years = computed(() =>
   Array.from(new Set([currentYear, currentYear - 1, ...props.reports.map((r) => r.year)])).sort((a, b) => b - a),
@@ -82,7 +84,7 @@ const yearReports = computed(() =>
   props.reports.filter((r) =>
     r.year === selectedYear.value
     && (selectedForm.value === 'all' || r.formCode === selectedForm.value)
-    && (!showDistrictFilter.value || props.filterDistrict === 'all' || r.district === props.filterDistrict)),
+    && (activeDistrict.value === 'all' || r.district === activeDistrict.value)),
 )
 
 const statusPriority: Record<string, number> = { submitted: 0, needs_revision: 1, ready_to_submit: 2, in_progress: 2, draft: 2, approved: 3 }
@@ -251,7 +253,7 @@ function exportFilteredReports(): void {
       <div v-if="showDistrictFilter" class="filter-group">
         <label>Район</label>
         <select
-          :value="props.filterDistrict"
+          :value="activeDistrict"
           class="filter-select"
           @change="emit('updateDistrict', ($event.target as HTMLSelectElement).value)"
         >
